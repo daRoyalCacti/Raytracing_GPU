@@ -1,6 +1,5 @@
 #include <iostream>
 #include <chrono>
-#include <curand_kernel.h>
 
 #include "vec3.h"
 #include "ray.h"
@@ -9,16 +8,7 @@
 
 #include "hittable_list.h"
 
-//checking cuda errors
-#define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
-void check_cuda(cudaError_t result, const char* const func, const char* const file, const int line) {
-	if (result) {
-		std::cerr << "\nCUDA error = " << static_cast<unsigned>(result) << "\n\tin file: " << file << "\n\tat line: " << line << "\n\t in func" << func << "\n";
-		//Call CUDA Device Reset before exiting
-		cudaDeviceReset();
-		exit(99);
-	}
-}
+
 
 __global__ void create_world(hittable **d_list, hittable **d_world) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//not need for parallism

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <iostream>
-#include <cmath>
+//#include <cmath>
 
-using std::sqrt;
+//using std::sqrt;
 
 
 struct vec3 {
@@ -44,16 +44,16 @@ struct vec3 {
 	__host__ __device__ inline float length_squared() const {
 		return e[0]*e[0] + e[1]*e[1] + e[2]*e[2];
 	}
-/*
-	__host__ __device__ inline static vec3 random() {	//static because does not need a particular vec3
-		return vec3(random_double(), random_double(), random_double());
+
+	__host__ __device__ inline static vec3 random(curandState *s) {	//static because does not need a particular vec3
+		return vec3(random_double(s), random_double(s), random_double(s));
 	}
 
 
-	__host__ __device__ inline static vec3 random(const float min, const float max) {
-		return vec3(random_double(min, max), random_double(min, max), random_double(min, max));
+	__host__ __device__ inline static vec3 random(curandState *s, const float min, const float max) {
+		return vec3(random_double(s, min, max), random_double(s, min, max), random_double(s, min, max));
 	}
-*/
+
 
 	__host__ __device__ inline bool near_zero() const {
 		//Returns true if the vector is near 0 in all constituent dimensions
@@ -111,23 +111,23 @@ __host__ __device__ inline vec3 unit_vector(const vec3 v) {
 	return v / v.length();
 }
 
-/*
-__host__ __device__ inline vec3 random_ in_unit_sphere() {
+
+__host__ __device__ inline vec3 random_ in_unit_sphere(curandState *s) {
 	while (true) {
-		const auto p = vec3::random(-1,1);
+		const auto p = vec3::random(s, -1,1);
 		if (p.length_squared() < 1) return p;
 	}
 }
 
-__host__ __device__ inline vec3 random_ in_unit_disk() {
+__host__ __device__ inline vec3 random_ in_unit_disk(curandState *s) {
 	while (true) {
-		const auto p = vec3(random_double(-1,1), random_double(-1,1), 0);
+		const auto p = vec3(random_double(s, -1,1), random_double(s, -1,1), 0);
 		if (p.length_squared() < 1) return p;
 	}
 }
 
-__host__ __device__ inline vec3 random_unit_ vector() {
-	return unit_ vector(random_ in_unit_sphere());
+__host__ __device__ inline vec3 random_unit_vector(curandState *s) {
+	return unit_ vector(random_ in_unit_sphere(s));
 }
 
 __host__ __device__ inline vec3 reflect(const vec3& v, const vec3& n) {
@@ -137,10 +137,10 @@ __host__ __device__ inline vec3 reflect(const vec3& v, const vec3& n) {
 
 __host__ __device__ inline vec3 refract(const vec3& uv, const vec3& n, const float etai_over_etat) {
 	//Computes the refracted ray of light passing through a dielectric material using snell's law
-	const auto cos_theta = fmin(dot(-uv, n), 1.0);	
+	const auto cos_theta = min(dot(-uv, n), 1.0);	
 	const vec3 r_out_perp = etai_over_etat * (uv + cos_theta*n);
-	const vec3 r_out_parallel = -sqrt(fabs(1.0 - r_out_perp.length_squared() )) * n;
+	const vec3 r_out_parallel = -sqrt(abs(1.0 - r_out_perp.length_squared() )) * n;
 	return r_out_perp + r_out_parallel;
 }
-*/
+
 

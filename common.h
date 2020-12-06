@@ -6,10 +6,23 @@
 #include <random>
 #include <curand_kernel.h>
 
+
 //common usings
 using std::shared_ptr;
 using std::make_shared;
 using std::sqrt;
+//checking cuda errors
+
+
+#define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
+void check_cuda(cudaError_t result, const char* const func, const char* const file, const int line) {
+	if (result) {
+		std::cerr << "\nCUDA error = " << static_cast<unsigned>(result) << "\n\tin file: " << file << "\n\tat line: " << line << "\n\t in func" << func << "\n";
+		//Call CUDA Device Reset before exiting
+		cudaDeviceReset();
+		exit(99);
+	}
+}
 
 //common constants
 constexpr float infinity = std::numeric_limits<float>::infinity();
@@ -22,6 +35,10 @@ __device__ inline float degrees_to_radians(float degrees) {
 
 __device__ inline float random_float(curandState *local_rand_state) {
 	return curand_uniform(local_rand_state);
+}
+
+__device__ inline float random_float(curandState *local_rand_state, const float min, const float max) {
+	return min + (min-max) * random_float(local_rand_state);
 }
 
 /*

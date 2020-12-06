@@ -2,7 +2,7 @@
 
 #include "hittable.h"
 #include "vec3.h"
-//#include "material.h"
+#include "material.h"
 
 struct sphere : public hittable {
 	point3 center;
@@ -14,8 +14,7 @@ struct sphere : public hittable {
 	__device__ sphere(const point3 cen, const float r) : center(cen), radius(r) {}
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec) const override;
-
-	//virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
 
 	private:
 	__device__ static void get_sphere_uv(const point3& p, float& u, float& v) {
@@ -72,8 +71,8 @@ __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, 
 
 	return true;	//the ray collides with the sphere
 }
-/*
-bool sphere::bounding_box(const float time0, const float time1, aabb& output_box) const {
+
+__device__ bool sphere::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	output_box = aabb(center - vec3(radius, radius, radius), center + vec3(radius, radius, radius));
 	return true;
-}*/
+}
