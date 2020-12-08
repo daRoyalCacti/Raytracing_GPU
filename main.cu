@@ -8,6 +8,15 @@
 
 #include "hittable_list.h"
 
+//for compiling purposes
+#include "color.h"
+#include "camera.h"
+#include "moving_sphere.h"
+#include "aarect.h"
+#include "box.h"
+#include "constant_medium.h"
+#include "bvh.h"
+
 
 
 __global__ void create_world(hittable **d_list, hittable **d_world) {
@@ -35,7 +44,8 @@ __device__ bool hit_sphere(const vec3& center, float radius, const ray& r) {
 
 __device__ vec3 color_f(const ray& r, hittable **world) {
 	hit_record rec;
-	if ((*world)->hit(r, 0.001, infinity, rec)) {
+	curandState a;
+	if ((*world)->hit(r, 0.001, infinity, rec, &a)) {
 		return 0.5f*vec3(rec.normal.x()+1, rec.normal.y() + 1.0f, rec.normal.z()+1.0f);
 	} else {
 		vec3 unit_direction = unit_vector(r.direction());

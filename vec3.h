@@ -1,9 +1,19 @@
 #pragma once
 
 #include <iostream>
+#include <curand_kernel.h>
 //#include <cmath>
 
 //using std::sqrt;
+
+//are sort of out of place here
+__device__ inline float random_float(curandState *local_rand_state) {
+	return curand_uniform(local_rand_state);
+}
+
+__device__ inline float random_float(curandState *local_rand_state, const float min, const float max) {
+	return min + (min-max) * random_float(local_rand_state);
+}
 
 
 struct vec3 {
@@ -45,13 +55,13 @@ struct vec3 {
 		return e[0]*e[0] + e[1]*e[1] + e[2]*e[2];
 	}
 
-	__host__ __device__ inline static vec3 random(curandState *s) {	//static because does not need a particular vec3
-		return vec3(random_double(s), random_double(s), random_double(s));
+	__device__ inline static vec3 random(curandState *s) {	//static because does not need a particular vec3
+		return vec3(random_float(s), random_float(s), random_float(s));
 	}
 
 
-	__host__ __device__ inline static vec3 random(curandState *s, const float min, const float max) {
-		return vec3(random_double(s, min, max), random_double(s, min, max), random_double(s, min, max));
+	__device__ inline static vec3 random(curandState *s, const float min, const float max) {
+		return vec3(random_float(s, min, max), random_float(s, min, max), random_float(s, min, max));
 	}
 
 
@@ -112,22 +122,22 @@ __host__ __device__ inline vec3 unit_vector(const vec3 v) {
 }
 
 
-__host__ __device__ inline vec3 random_ in_unit_sphere(curandState *s) {
+__device__ inline vec3 random_in_unit_sphere(curandState *s) {
 	while (true) {
 		const auto p = vec3::random(s, -1,1);
 		if (p.length_squared() < 1) return p;
 	}
 }
 
-__host__ __device__ inline vec3 random_ in_unit_disk(curandState *s) {
+__device__ inline vec3 random_in_unit_disk(curandState *s) {
 	while (true) {
-		const auto p = vec3(random_double(s, -1,1), random_double(s, -1,1), 0);
+		const auto p = vec3(random_float(s, -1,1), random_float(s, -1,1), 0);
 		if (p.length_squared() < 1) return p;
 	}
 }
 
-__host__ __device__ inline vec3 random_unit_vector(curandState *s) {
-	return unit_ vector(random_ in_unit_sphere(s));
+__device__ inline vec3 random_unit_vector(curandState *s) {
+	return unit_vector(random_in_unit_sphere(s));
 }
 
 __host__ __device__ inline vec3 reflect(const vec3& v, const vec3& n) {

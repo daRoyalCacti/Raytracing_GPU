@@ -43,11 +43,11 @@ class camera {
 		lens_radius = aperture/2;
 	}
 
-	__device__ ray get_ray(curandState *s, const double s, const double t) const {
+	__device__ ray get_ray(curandState *state, const double s, const double t) const {
 		//uses the thin lens approximation to generate depth of field
-		const vec3 rd = lens_radius * random_in_unit_disk(s);	//randomness is required to get the blur
+		const vec3 rd = lens_radius * random_in_unit_disk(state);	//randomness is required to get the blur
 		const vec3 offset = u * rd.x() + v*rd.y();		//offset for where the light is coming from
 
-		return ray(origin + offset, lower_left_corner + s*horizontal + t*vertical - origin - offset, random_double(time0, time1));	//random time to simulate motion blur
+		return ray(origin + offset, lower_left_corner + s*horizontal + t*vertical - origin - offset, random_float(state, time0, time1));	//random time to simulate motion blur
 	}
 };

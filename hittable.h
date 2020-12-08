@@ -23,7 +23,7 @@ struct hit_record {
 };
 
 struct hittable {
-	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec) const = 0;	//function to tell when a ray hits the object
+	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const = 0;	//function to tell when a ray hits the object
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const = 0;		//function that creates a bounding box around the object
 };
 
@@ -32,12 +32,12 @@ struct translate : public hittable {
 	hittable *ptr;
 	vec3 offset;
 
-	__device__ translate(const hittable *p, const vec3& displacement) : ptr(p), offset(displacement) {}
+	__device__ translate(hittable *p, const vec3& displacement) : ptr(p), offset(displacement) {}
 
-	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec) const override {
+	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override {
 		const ray moved_r(r.origin() - offset, r.direction(), r.time());	//moving object by offset is same as translting axes by -offset
 		
-		if(!ptr->hit(moved_r, t_min, t_max, rec))	//if ray doesn't hits object in new axes
+		if(!ptr->hit(moved_r, t_min, t_max, rec, s ))	//if ray doesn't hits object in new axes
 			return false;
 
 		rec.p += offset;
@@ -63,9 +63,9 @@ struct rotate_y : public hittable {
 	bool hasbox;			//required to carry info from constructor to bounding_box
 	aabb bbox;
 
-	__device__ rotate_y(const hittable *p, const float angle);
+	__device__ rotate_y(hittable *p, const float angle);
 
-	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec) const override;
+	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		output_box = bbox;
@@ -73,7 +73,7 @@ struct rotate_y : public hittable {
 	}
 };
 
-__device__ rotate_y::rotate_y(const hittable *p, const float angle) : ptr(p) {
+__device__ rotate_y::rotate_y(hittable *p, const float angle) : ptr(p) {
 	const auto radians = degrees_to_radians(angle);
 	sin_theta = sin(radians);
 	cos_theta = cos(radians);
@@ -107,7 +107,7 @@ __device__ rotate_y::rotate_y(const hittable *p, const float angle) : ptr(p) {
 	bbox = aabb(min,max);
 }
 
-__device__ bool rotate_y::hit(const ray& r, const float t_min, const float t_max, hit_record& rec) const {
+__device__ bool rotate_y::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	auto origin = r.origin();
 	auto direction = r.direction();
 	
@@ -121,7 +121,7 @@ __device__ bool rotate_y::hit(const ray& r, const float t_min, const float t_max
 
 	const ray rotated_r(origin, direction, r.time());	//where the ray is coming from in the new frame
 
-	if (!ptr->hit(rotated_r, t_min, t_max, rec))	//if the ray doesn't hit in the new frame
+	if (!ptr->hit(rotated_r, t_min, t_max, rec, s))	//if the ray doesn't hit in the new frame
 		return false;				//also sets rec
 
 	auto p = rec.p;

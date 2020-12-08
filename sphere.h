@@ -13,7 +13,7 @@ struct sphere : public hittable {
 	//__device__ sphere(const point3 cen, const float r, const shared_ptr<material> m): center(cen), radius(r), mat_ptr(m) {}
 	__device__ sphere(const point3 cen, const float r) : center(cen), radius(r) {}
 
-	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec) const override;
+	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
 
 	private:
@@ -33,7 +33,7 @@ struct sphere : public hittable {
 	}
 };
 
-__device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, hit_record& rec) const {
+__device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	//using the quadratic equation to find if (and when) 'ray' collides with sphere centred at 'center' with radius 'radius'
 	
 	const vec3 oc = r.origin() - center;	

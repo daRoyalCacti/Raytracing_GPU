@@ -5,8 +5,11 @@
 
 #include "common.h"
 
+#include <functional>
+
 #include "hittable.h"
 #include "hittable_list.h"
+#include "box.h"
 
 struct bvh_node : public hittable {
 	hittable *left;	//left and right nodes on the tree
@@ -14,10 +17,12 @@ struct bvh_node : public hittable {
 	aabb box;			//the box for the current node
 
 	__device__ bvh_node();
-	__device__ bvh_node(const hittable_list& list, const float time0, const float time1) : bvh_node(list.objects, 0, list.objects.size(), time0, time1) {}
-	__device__ bvh_node(const hittable** src_objects, const size_t start, const size_t end, const float time0, const float time1);
+	__device__ bvh_node(hittable_list& list,  const float time0, const float time1, curandState *s) {
+		bvh_node(list.objects, 0, list.list_size, time0, time1, s);
+	}
+	__device__ bvh_node(hittable** src_objects, const size_t start, const size_t end, const float time0, const float time1, curandState *s);
 
-	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec) const override;
+	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
 };
 
@@ -26,17 +31,17 @@ __device__ bool bvh_node::bounding_box(const float time0, const float time1, aab
 	return true;
 }
 
-__device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max, hit_record& rec) const {
+__device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	if (!box.hit(r, t_min, t_max)) return false;	//if it didn't hit the large bounding box
 
-	const bool hit_left = left->hit(r, t_min, t_max, rec);	//did the ray hit the left hittable
-	const bool hit_right = right->hit(r, t_min, hit_left ? rec.t : t_max, rec);	//did the ray hit the right hittable
+	const bool hit_left = left->hit(r, t_min, t_max, rec, s);	//did the ray hit the left hittable
+	const bool hit_right = right->hit(r, t_min, hit_left ? rec.t : t_max, rec, s);	//did the ray hit the right hittable
 											//if the ray hit the left, check to make sure it hit the right before the left
 											// - so rec is set correctly
 	return hit_left || hit_right;
 }
 
-__device__ inline bool box_compare(const hittable* a, const shared_ptr<hittable> b, const int axis) {
+__device__ inline bool box_compare(const hittable* a, const hittable *b, const int axis) {
 	aabb box_a;
 	aabb box_b;
 
@@ -61,10 +66,17 @@ __device__ inline bool box_z_compare (const hittable *a, const hittable *b) {
 	return box_compare(a, b, 2);
 }
 
-__device__ bvh_node::bvh_node(const hittable** src_objects, const size_t start, const size_t end, const float time0, const float time1) {
+
+
+//__device__ void d_sort(hittable** arr, int low, int high, std::function<__device__ bool (const hittable*, const hittable*)>) {
+//
+//}
+
+
+__device__ bvh_node::bvh_node(hittable** src_objects,  const size_t start, const size_t end, const float time0, const float time1, curandState *s) {
 	auto objects = src_objects;	//Create a modifiable array for the sorce scene objects
 
-	const auto axis = random_int(0,2);
+	const auto axis = random_int(s,0,2);
 	const auto comparator =   (axis==0) ? box_x_compare	//used to sort boxes into close and far to a given axis
 				: (axis==1) ? box_y_compare
 					    : box_z_compare;
@@ -85,11 +97,13 @@ __device__ bvh_node::bvh_node(const hittable** src_objects, const size_t start, 
 		}
 
 	} else {
-		std::sort(objects.begin() + start, objects.begin() + end, comparator);
+		//std::sort(objects[0] + start, objects[0] + end, comparator);
+		//d_sort(objects, start, end, comparator);
+		comparator(objects[0]+start, objects[0]+end);
 
 		const auto mid = start + object_span /2;
-		left = make_shared<bvh_node>(objects, start, mid, time0, time1);
-		right = make_shared<bvh_node>(objects, mid, end, time0, time1);
+		left = new bvh_node(objects, start, mid, time0, time1, s);
+		right = new bvh_node(objects, mid, end, time0, time1, s);
 	}
 
 	aabb box_left, box_right;

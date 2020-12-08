@@ -7,20 +7,22 @@
 struct hit_record;
 
 struct material {
-	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered) const = 0;	
+	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const = 0;	
 	__device__ virtual color emitted(const float u, const float v, const point3& p) const {
 		return color(0, 0, 0);
 	}
 };
 
 struct lambertian : public material {
-	texture *albedo;
+	texturez *albedo;
 	
-	lambertian(const color& a) : albedo(solid_color(a)) {}
-	lambertian(const texture* a) : albedo(a) {}
+	__device__ lambertian(const color& a) {
+		albedo = new solid_color(a);
+	}
+	__device__ lambertian(texturez* a) : albedo(a) {}
 
-	virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered) const override {
-		auto scatter_direction = rec.normal + random_unit_vector();
+	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
+		auto scatter_direction = rec.normal + random_unit_vector(s);
 		
 		//Catch degenerate scattering direction
 		if (scatter_direction.near_zero())
@@ -34,17 +36,19 @@ struct lambertian : public material {
 
 
 struct metal : public material {
-	texture *albedo;
+	texturez *albedo;
 	float fuzz;	//how much light spreads out on collison
 			//fuzz = 0 for perfect reflections
 			//fuzz = 1 for very fuzzy reflections
 
-	metal(const color& a, const float f = 0) : albedo(solid_color(a)), fuzz(f) {}
-	metal(const texture *a) : albedo(a) {}
+	__device__ metal(const color& a, const float f = 0) : fuzz(f) {
+		albedo = new solid_color(a);
+	}
+	__device__ metal(texturez *a) : albedo(a) {}
 
-	virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered) const override {
+	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
 		vec3 reflected = reflect(unit_vector(ray_in.direction()), rec.normal);	//the incomming ray reflected about the normal
-		scattered = ray(rec.p, reflected + fuzz * random_in_unit_sphere(), ray_in.time());	//the scattered ray
+		scattered = ray(rec.p, reflected + fuzz * random_in_unit_sphere(s), ray_in.time());	//the scattered ray
 		attenuation = albedo->value(rec.u, rec.v, rec.p);
 		return (dot(scattered.direction(), rec.normal) > 0);	//making sure scattering not oppsoing the normal
 	}
@@ -54,9 +58,9 @@ struct metal : public material {
 struct dielectric : public material {
 	float ir;	//index of refraction of the material
 
-	dielectric(const float index_of_refraction) : ir(index_of_refraction) {}
+	__device__ dielectric(const float index_of_refraction) : ir(index_of_refraction) {}
 
-	virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered) const override {
+	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
 		attenuation = color(1.0, 1.0, 1.0);	//material should be clear so white is a good choice for the color (absorbs nothing)
 		const float refraction_ratio = rec.front_face ? (1.0f/ir) : ir;	//refraction ratio = (refractive index of incident material) / (refrative index of transmitted material)
 										//assuiming that the incident material is air, and the refractive index of air is 1
@@ -77,7 +81,7 @@ struct dielectric : public material {
 		vec3 direction;
 		
 		//uses the Schlick approximation to give reflectivity that varies with angle
-		if (cannot_refract || reflectance(cos_theta, refraction_ratio) > random_float()) {
+		if (cannot_refract || reflectance(cos_theta, refraction_ratio) > random_float(s)) {
 			//Must reflect
 			direction = reflect(unit_direction, rec.normal);
 		} else {
@@ -90,7 +94,7 @@ struct dielectric : public material {
 	}
 
 	private:
-	static float reflectance(const float cosine, const float ref_idx) {
+	__device__ static float reflectance(const float cosine, const float ref_idx) {
 		//use Schlick's approximation for reflectance
 		const auto sqrt_r0 = (1.0f-ref_idx) / (1.0f+ref_idx);
 		const auto r0 = sqrt_r0 * sqrt_r0;
@@ -100,29 +104,33 @@ struct dielectric : public material {
 
 
 struct diffuse_light : public material {
-	texture *emit;
+	texturez *emit;
 
-	diffuse_light(const texture *a) : emit(a) {}
-	diffuse_light(const color c) : emit(solid_color(c)) {}
+	__device__ diffuse_light(texturez *a) : emit(a) {}
+	__device__ diffuse_light(const color c) {
+		emit = new solid_color(c);
+	}
 
-	virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) const override {
+	__device__ virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
 		return false;
 	}
 
-	virtual color emitted(const float u, const float v, const point3& p) const {
+	__device__ virtual color emitted(const float u, const float v, const point3& p) const {
 		return emit->value(u, v, p);
 	}
 };
 
 //for scattering
 struct isotropic : public material {
-	texture *albedo;
+	texturez *albedo;
 
-	isotropic(const color c) : albedo(solid_color(c)) {}
-	isotropic(texture *a) : albedo(a) {}
+	__device__ isotropic(const color c){
+		albedo = new solid_color(c);
+	}
+	__device__ isotropic(texturez *a) : albedo(a) {}
 
-	virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered) const override {
-		scattered = ray(rec.p, random_in_unit_sphere(), ray_in.time());	//pick a random direction for the ray to scatter
+	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
+		scattered = ray(rec.p, random_in_unit_sphere(s), ray_in.time());	//pick a random direction for the ray to scatter
 		attenuation = albedo->value(rec.u, rec.v, rec.p);
 		return true;
 	}

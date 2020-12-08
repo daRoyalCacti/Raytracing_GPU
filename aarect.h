@@ -10,12 +10,12 @@ struct xy_rect : public hittable {
 	float x0, x1, y0, y1, k;	//x's and y's define a rectangle in the standard way
 					//k defines z position
 	__device__ xy_rect() {}
-	__device__ xy_rect(const float _x0, const double _x1, const double _y0, const double _y1, const double _k, const material *mat)
+	__device__ xy_rect(const float _x0, const float _x1, const float _y0, const float _y1, const float _k, material *mat)
 		: x0(_x0), x1(_x1), y0(_y0), y1(_y1), k(_k), mp(mat) {};
 	
-	__device__ virtual bool hit(const ray& r, const float t_min, const double t_max, hit_record& rec) const override;
+	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const double time1, aabb& output_box) const override {
+	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		//just padding the z direction by a small amount
 		const float small = 0.0001;
 		output_box = aabb(point3(x0, y0, k-small), point3(x1, y1, k+small));
@@ -29,12 +29,12 @@ struct xz_rect : public hittable {
 	float x0, x1, z0, z1, k;	//k defines y position
 
 	__device__ xz_rect() {}
-	__device__ xz_rect(const float _x0, const double _x1, const double _z0, const double _z1, const double _k, const material *mat)
+	__device__ xz_rect(const float _x0, const float _x1, const float _z0, const float _z1, const float _k, material *mat)
 		: x0(_x0), x1(_x1), z0(_z0), z1(_z1), k(_k), mp(mat) {};
 
-	__device__ virtual bool hit(const ray&r, const float t_min, const double t_max, hit_record& rec) const override;
+	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 	
-	__device__ virtual bool bounding_box(const float time0, const double time1, aabb& output_box) const override {
+	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		const float small = 0.0001;
 		output_box = aabb(point3(x0, k-small, z1), point3(x1, k+small, z1));
 		return true;
@@ -47,12 +47,12 @@ struct yz_rect : public hittable {
 	float y0, y1, z0, z1, k;	//k defines x position
 
 	__device__ yz_rect() {}
-	__device__ yz_rect(const float _y0, const double _y1, const double _z0, const double _z1, const double _k, const material *mat)
+	__device__ yz_rect(const float _y0, const float _y1, const float _z0, const float _z1, const float _k, material *mat)
 		: y0(_y0), y1(_y1), z0(_z0), z1(_z1), k(_k), mp(mat) {};
 
-	__device__ virtual bool hit(const ray&r, const float t_min, const double t_max, hit_record& rec) const override;
+	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const double time1, aabb& output_box) const override {
+	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		const float small = 0.0001;
 		output_box = aabb(point3(k-small, y0, z0), point3(k+small, y1, z1));
 		return true;
@@ -60,7 +60,7 @@ struct yz_rect : public hittable {
 };
 
 
-__device__ bool xy_rect::hit(const ray&r, const float t_min, const double t_max, hit_record& rec) const {
+__device__ bool xy_rect::hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const {
 	const auto t = (k-r.origin().z()) / r.direction().z();	//time of collision - see aabb.h for why this is the case
 
 	if (t < t_min || t > t_max)	//if collision is outside of specified times
@@ -91,7 +91,7 @@ __device__ bool xy_rect::hit(const ray&r, const float t_min, const double t_max,
 
 
 
-__device__ bool xz_rect::hit(const ray&r, const float t_min, const double t_max, hit_record& rec) const {
+__device__ bool xz_rect::hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const {
 	const auto t = (k-r.origin().y()) / r.direction().y();	//time of collision - see aabb.h for why this is the case
 
 	if (t < t_min || t > t_max)	//if collision is outside of specified times
@@ -121,7 +121,7 @@ __device__ bool xz_rect::hit(const ray&r, const float t_min, const double t_max,
 
 
 
-__device__ bool yz_rect::hit(const ray&r, const float t_min, const double t_max, hit_record& rec) const {
+__device__ bool yz_rect::hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const {
 	const auto t = (k-r.origin().x()) / r.direction().x();	//time of collision - see aabb.h for why this is the case
 
 	if (t < t_min || t > t_max)	//if collision is outside of specified times
