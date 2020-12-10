@@ -19,30 +19,32 @@
 
 
 
-__global__ void create_world(hittable **d_list, hittable **d_world) {
-	if (threadIdx.x == 0 && blockIdx.x == 0) {	//not need for parallism
-		*(d_list)   = new sphere(vec3(0,0,-1), 0.5);
-		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100);
+__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		*(d_list)   = new sphere(vec3(0,0,-1), 0.5, new lambertian(vec3(0, 1, 0)));
+		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, new lambertian(vec3(0, 0, 1)));
 		*d_world    = new hittable_list(d_list,2);
+		*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
 	}
 }
 
-__global__ void free_world(hittable ** d_list, hittable **d_world) {
+__global__ void free_world(hittable ** d_list, hittable **d_world, camera **d_camera) {
 	delete *(d_list);
 	delete *(d_list+1);
 	delete *d_world;
+	delete *d_camera;
 }
 
-__device__ bool hit_sphere(const vec3& center, float radius, const ray& r) {
+/*__device__ bool hit_sphere(const vec3& center, float radius, const ray& r) {
 	vec3 oc = r.origin() - center;
 	float a = dot(r.direction(), r.direction());
 	float b = 2.0f * dot(oc, r.direction());
 	float c = dot(oc, oc) - radius*radius;
 	float discriminant = b*b - 4.0f*a*c;
 	return (discriminant > 0.0f);
-}
+}*/
 
-__device__ vec3 color_f(const ray& r, hittable **world) {
+/*__device__ vec3 color_f(const ray& r, hittable **world, curandState *local_rand_state) {
 	hit_record rec;
 	curandState a;
 	if ((*world)->hit(r, 0.001, infinity, rec, &a)) {
@@ -52,7 +54,55 @@ __device__ vec3 color_f(const ray& r, hittable **world) {
 		float t = 0.5f*(unit_direction.y() + 1.0f);
 		return (1.0f-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
 	}
+}*/
+
+__device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
+	const vec3 background(0.7f, 0.8f, 1.0f);
+
+	hit_record rec;
+
+	if (depth <= 0)
+		return color(0,0,0);
+	
+	if (!(*world)->hit(r, 0.001f, infinity, rec, local_rand_state)) 
+		return background;
+
+	ray scattered;
+	color attenuation;
+	const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+
+	if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered, local_rand_state))
+		return emitted;
+	//attenuation = vec3(0.5f, 0.5f, 0.5f);
+	//scattered = ray(rec.p, rec.normal+random_in_unit_sphere(local_rand_state));//ray(rec.p, rec.normal + random_in_unit_sphere(local_rand_state));
+	
+	return emitted + attenuation*color_f(scattered, world, local_rand_state, depth-1);	
 }
+
+/*__device__ vec3 color_f(const ray& r, hittable **world, curandState *local_rand_state, int depth) {
+	const vec3 background(0.7f, 0.8f, 1.0f);
+	ray current_ray = r;
+	vec3 current_attenuation = vec3(1.0f, 1.0f, 1.0f);
+	vec3 result = vec3(0.0f, 0.0f, 0.0f);
+	
+	while (depth > 0) {
+		hit_record rec;
+		if(world[0]->hit(current_ray, 0.001f, infinity, rec) ) {
+			color emittedColor = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+			ray scattered;
+			vec3 attenuation;
+			
+			if (rec.mat_ptr->scatter(r, rec, attenuation, scattered, local_rand_state) ) {
+
+			} else {
+
+			}
+		} else {
+			return emitted + current_attenuation*background;
+		}
+	}	
+	return vec3(0.0f, 0.0f, 0.0f);
+}*/
 
 __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -64,7 +114,7 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 	curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
 }
 
-__global__ void render(vec3* fb, int max_x, int max_y, int ns, vec3 lower_left_corner, vec3 horizontal, vec3 vertical, vec3 origin, curandState *rand_state,  hittable **world) {
+__global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, curandState *rand_state,  hittable **world, int max_depth) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
 	int j = threadIdx.y + blockIdx.y * blockDim.y;
 	if((i >= max_x) || (j >= max_y)) return;	//if trying the work with more values than wanted
@@ -76,11 +126,16 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, vec3 lower_left_c
 	for(int s=0; s < ns; s++) {
 		float u = float(i+random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
-		ray r(origin,lower_left_corner + u*horizontal + v*vertical);
-		col += color_f(r, world);
+		//ray r(origin,lower_left_corner + u*horizontal + v*vertical);
+
+		ray r = (*cam)->get_ray(rand_state, u,v);
+		//col += color_f(r, world);
+
+		col += color_f(r, world, &local_rand_state, max_depth);
 	}
 
 	fb[pixel_index] = col/float(ns);
+	//fb[pixel_index] = vec3(random_float(rand_state, -1, 1),random_float(rand_state, -1, 1), random_float(rand_state, -1, 1));
 }
 
 
@@ -95,40 +150,52 @@ int main() {
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
 
+	std::cerr << "Generating a " << nx << "x" << ny << " image with " << ns << " rays per pixel\n";
+	std::cerr << "using " << tx << "x" << ty << " blocks.\n";
+
+
+
+	std::cerr << "Allocating Frame Buffer" << std::endl;
 	//Frame buffer (holds the image in the GPU)
 	vec3 *fb;
 	const size_t fb_size = num_pixels*sizeof(vec3);	
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
-
-	//make our world of hittables
+	
+	std::cerr << "Creating World" << std::endl;
+	//make our world of hittables and the camera
 	hittable **d_list;
 	checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	//2 because 2 hittables
 	hittable **d_world;
 	checkCudaErrors(cudaMalloc((void**)&d_world, sizeof(hittable *) ));
-	create_world<<<1,1>>>(d_list, d_world);		//create_world is defined above
+
+	camera **d_camera;
+	checkCudaErrors(cudaMalloc((void**)&d_camera, sizeof(camera*) ));
+
+	create_world<<<1,1>>>(d_list, d_world, d_camera);		//create_world is defined above
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 
+	
 	//Render to the frame buffer
 	dim3 blocks(nx/tx+1, ny/ty+1);
 	dim3 threads(tx, ty);
 	curandState *d_rand_state;
 	checkCudaErrors(cudaMalloc((void**)&d_rand_state, num_pixels*sizeof(curandState) ));
 
+	std::cerr << "Intialising the render" << std::endl;
 	render_init<<<blocks, threads>>>(nx, ny, d_rand_state);		//initialising the render -- currently just setting up the random numbers
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
-
+	
+	std::cerr << "Rendering to frame buffer" << std::endl;
 	render<<<blocks, threads>>>(fb, nx, ny, ns,	//render is a function defined above
-					vec3(-2.0, -1.0, -1.0),
-					vec3(4.0, 0.0, 0.0),
-					vec3(0.0, 2.0, 0.0),
-					vec3(0.0, 0.0, 0.0),
+					d_camera,
 					d_rand_state,
-					d_world);		
+					d_world, 10);		
 	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());	//lets the CUP that the GPU is done rendering
-
+	checkCudaErrors(cudaDeviceSynchronize());	//tells the CPU that the GPU is done rendering
+	
+	std::cerr << "Outputting image" << std::endl;
 	//Ouput FB as Image
 	std::cout << "P3\n" << nx << " " << ny << "\n255\n";
 	for (int j = ny-1; j>=0; j--) 
@@ -142,9 +209,10 @@ int main() {
 			std::cout << ir << " " << ig << " " << ib << "\n";
 		}
 	
+	std::cerr << "Cleaning Up" << std::endl;	
 	//clean up
 	checkCudaErrors(cudaDeviceSynchronize());
-	free_world<<<1,1>>>(d_list,d_world);
+	free_world<<<1,1>>>(d_list,d_world,d_camera);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaFree(d_list));
 	checkCudaErrors(cudaFree(d_world));

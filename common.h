@@ -20,7 +20,7 @@ using std::sqrt;
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 void check_cuda(cudaError_t result, const char* const func, const char* const file, const int line) {
 	if (result) {
-		std::cerr << "\nCUDA error = " << static_cast<unsigned>(result) << "\n\tin file: " << file << "\n\tat line: " << line << "\n\t in func" << func << "\n";
+		std::cerr << "\nCUDA error = " << static_cast<unsigned>(result) << "\n\tin file: " << file << "\n\tat line: " << line << "\n\tin func " << func << "\n";
 		//Call CUDA Device Reset before exiting
 		cudaDeviceReset();
 		exit(99);

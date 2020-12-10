@@ -12,7 +12,7 @@ __device__ inline float random_float(curandState *local_rand_state) {
 }
 
 __device__ inline float random_float(curandState *local_rand_state, const float min, const float max) {
-	return min + (min-max) * random_float(local_rand_state);
+	return min + (max-min) * random_float(local_rand_state);
 }
 
 
@@ -65,10 +65,10 @@ struct vec3 {
 	}
 
 
-	__host__ __device__ inline bool near_zero() const {
+	__device__ inline bool near_zero() const {
 		//Returns true if the vector is near 0 in all constituent dimensions
-		const auto s = 1e-8;	//what is considered 'near 0'
-		return (fabs(e[0]) < s) && (fabs(e[1]) < s) && (fabs(e[2]) < s);
+		const auto s = 1e-6;	//what is considered 'near 0'
+		return (fabsf(e[0]) < s) && (fabsf(e[1]) < s) && (fabsf(e[2]) < s);
 	}
 };
 

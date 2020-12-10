@@ -7,16 +7,16 @@ class camera {
 	point3 lower_left_corner;
 	vec3 horizontal;
 	vec3 vertical;
-	double lens_radius;
-	double time0, time1;	//shutter open/close times
+	float lens_radius;
+	float time0, time1;	//shutter open/close times
 	
 	vec3 u, v, w;
 
 	public:
 	__device__ camera() {}
 
-	__device__ camera(const point3 lookfrom, const vec3 lookat, const vec3 vup, const double vfov, const double aspect_ratio, const double aperture, const double focus_dist,
-			const double _time0, const double _time1) : time0(_time0), time1(_time1) {
+	__device__ camera(const point3 lookfrom, const vec3 lookat, const vec3 vup, const float vfov, const float aspect_ratio, const float aperture, const float focus_dist,
+			const float _time0, const float _time1) : time0(_time0), time1(_time1) {
 		//vfov := vertical field of view in degrees
 		//lookfrom := position of the camera
 		//lookat := point for the camera to look at
@@ -43,7 +43,7 @@ class camera {
 		lens_radius = aperture/2;
 	}
 
-	__device__ ray get_ray(curandState *state, const double s, const double t) const {
+	__device__ inline ray get_ray(curandState *state, const float s, const float t) const {
 		//uses the thin lens approximation to generate depth of field
 		const vec3 rd = lens_radius * random_in_unit_disk(state);	//randomness is required to get the blur
 		const vec3 offset = u * rd.x() + v*rd.y();		//offset for where the light is coming from

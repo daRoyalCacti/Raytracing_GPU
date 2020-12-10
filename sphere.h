@@ -8,10 +8,11 @@ struct sphere : public hittable {
 	point3 center;
 	float radius;
 	//shared_ptr<material> mat_ptr;
+	material* mat_ptr;
 
 	__device__ sphere() {}
-	//__device__ sphere(const point3 cen, const float r, const shared_ptr<material> m): center(cen), radius(r), mat_ptr(m) {}
-	__device__ sphere(const point3 cen, const float r) : center(cen), radius(r) {}
+	__device__ sphere(const point3 cen, const float r, material* m): center(cen), radius(r), mat_ptr(m) {}
+	//__device__ sphere(const point3 cen, const float r) : center(cen), radius(r) {}
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
@@ -63,7 +64,8 @@ __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, 
 	const vec3 outward_normal = (rec.p - center) / radius;	//a normal vector is just a point on the sphere less the center
 								//dividing by radius to make it normalised
 	rec.set_face_normal(r, outward_normal);
-	//rec.mat_ptr = mat_ptr;
+	//rec.normal = (r.at(root) - center)/radius * 1.5;
+	rec.mat_ptr = mat_ptr;
 
 	get_sphere_uv(outward_normal, rec.u, rec.v);	//setting the texture coordinates
 							//outward_normal is technical a vec3 not a point3 but they are the same thing

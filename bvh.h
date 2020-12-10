@@ -67,10 +67,36 @@ __device__ inline bool box_z_compare (const hittable *a, const hittable *b) {
 }
 
 
+__device__ int  d_partition(hittable** arr, int low, int high, int axis) {
+	const auto comparator =   (axis==0) ? box_x_compare	//used to sort boxes into close and far to a given axis
+				: (axis==1) ? box_y_compare
+					    : box_z_compare;
+	
+	auto pivot = arr[high];
+	auto i = low - 1;
 
-//__device__ void d_sort(hittable** arr, int low, int high, std::function<__device__ bool (const hittable*, const hittable*)>) {
-//
-//}
+	for (int j = low; j <= high - 1; j++) {
+		if (comparator(arr[j], pivot) ) {
+			i++;
+			auto temp = arr[i];
+			arr[i] = arr[j];
+			arr[j] = temp;
+		}
+	}
+	auto temp = arr[i+1];
+	arr[i+1] = arr[high];
+	arr[high] = temp;
+	return i+1;
+}
+
+__device__ void d_sort(hittable** arr, int low, int high, int axis) {
+	if (low < high) {
+		auto pi = d_partition(arr, low, high, axis);
+		
+		d_sort(arr, low, pi-1, axis);
+		d_sort(arr, pi+1, high, axis);	
+	}
+}
 
 
 __device__ bvh_node::bvh_node(hittable** src_objects,  const size_t start, const size_t end, const float time0, const float time1, curandState *s) {
@@ -98,8 +124,8 @@ __device__ bvh_node::bvh_node(hittable** src_objects,  const size_t start, const
 
 	} else {
 		//std::sort(objects[0] + start, objects[0] + end, comparator);
-		//d_sort(objects, start, end, comparator);
-		comparator(objects[0]+start, objects[0]+end);
+		d_sort(objects, start, end, axis);
+		
 
 		const auto mid = start + object_span /2;
 		left = new bvh_node(objects, start, mid, time0, time1, s);
