@@ -145,7 +145,7 @@ int main() {
 	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
 	const unsigned num_pixels = nx*ny;
-	const unsigned ns = 100;	//rays per pixel
+	const unsigned ns = 1000;	//rays per pixel
 
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
@@ -155,13 +155,13 @@ int main() {
 
 
 
-	std::cerr << "Allocating Frame Buffer" << std::endl;
+	std::cerr << "Allocating Frame Buffer" << std::flush;
 	//Frame buffer (holds the image in the GPU)
 	vec3 *fb;
 	const size_t fb_size = num_pixels*sizeof(vec3);	
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
 	
-	std::cerr << "Creating World" << std::endl;
+	std::cerr << "\rCreating World" << std::flush;
 	//make our world of hittables and the camera
 	hittable **d_list;
 	checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	//2 because 2 hittables
@@ -182,12 +182,12 @@ int main() {
 	curandState *d_rand_state;
 	checkCudaErrors(cudaMalloc((void**)&d_rand_state, num_pixels*sizeof(curandState) ));
 
-	std::cerr << "Intialising the render" << std::endl;
+	std::cerr << "\rIntialising the render" << std::flush;
 	render_init<<<blocks, threads>>>(nx, ny, d_rand_state);		//initialising the render -- currently just setting up the random numbers
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 	
-	std::cerr << "Rendering to frame buffer" << std::endl;
+	std::cerr << "\rRendering to frame buffer" << std::flush;
 	render<<<blocks, threads>>>(fb, nx, ny, ns,	//render is a function defined above
 					d_camera,
 					d_rand_state,
@@ -195,21 +195,10 @@ int main() {
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tells the CPU that the GPU is done rendering
 	
-	std::cerr << "Outputting image" << std::endl;
-	//Ouput FB as Image
-	std::cout << "P3\n" << nx << " " << ny << "\n255\n";
-	for (int j = ny-1; j>=0; j--) 
-		for (int i = 0; i < nx; i++) {
-			const size_t pixel_index = j*nx + i;
-			
-			const int ir = int(255.99*fb[pixel_index].x() );
-			const int ig = int(255.99*fb[pixel_index].y() );
-			const int ib = int(255.99*fb[pixel_index].z() );
+	std::cerr << "\rOutputting image" << std::flush;
+	write_frame_buffer(std::cout, fb, nx, ny);
 
-			std::cout << ir << " " << ig << " " << ib << "\n";
-		}
-	
-	std::cerr << "Cleaning Up" << std::endl;	
+	std::cerr << "\rCleaning Up" << std::flush;	
 	//clean up
 	checkCudaErrors(cudaDeviceSynchronize());
 	free_world<<<1,1>>>(d_list,d_world,d_camera);
@@ -217,6 +206,8 @@ int main() {
 	checkCudaErrors(cudaFree(d_list));
 	checkCudaErrors(cudaFree(d_world));
 	checkCudaErrors(cudaFree(fb));
+
+	std::cerr << std::endl;
 
 	return 0;
 }
