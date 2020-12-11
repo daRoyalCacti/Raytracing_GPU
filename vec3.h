@@ -48,7 +48,7 @@ struct vec3 {
 	}
 
 	__host__ __device__ inline float length() const {
-		return sqrt(length_squared());
+		return sqrtf(length_squared());
 	}
 
 	__host__ __device__ inline float length_squared() const {
@@ -67,7 +67,7 @@ struct vec3 {
 
 	__device__ inline bool near_zero() const {
 		//Returns true if the vector is near 0 in all constituent dimensions
-		const auto s = 1e-6;	//what is considered 'near 0'
+		const float s = 1e-6;	//what is considered 'near 0'
 		return (fabsf(e[0]) < s) && (fabsf(e[1]) < s) && (fabsf(e[2]) < s);
 	}
 };

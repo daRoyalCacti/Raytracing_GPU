@@ -22,7 +22,7 @@ struct lambertian : public material {
 	__device__ lambertian(texturez* a) : albedo(a) {}
 
 	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
-		auto scatter_direction = rec.normal + random_unit_vector(s);
+		vec3 scatter_direction = rec.normal + random_unit_vector(s);
 		
 		//Catch degenerate scattering direction
 		if (scatter_direction.near_zero())

@@ -17,6 +17,7 @@
 #include "constant_medium.h"
 #include "bvh.h"
 
+#include "scenes.h"
 
 
 __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
@@ -28,33 +29,9 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 	}
 }
 
-__global__ void free_world(hittable ** d_list, hittable **d_world, camera **d_camera) {
-	delete *(d_list);
-	delete *(d_list+1);
-	delete *d_world;
-	delete *d_camera;
-}
 
-/*__device__ bool hit_sphere(const vec3& center, float radius, const ray& r) {
-	vec3 oc = r.origin() - center;
-	float a = dot(r.direction(), r.direction());
-	float b = 2.0f * dot(oc, r.direction());
-	float c = dot(oc, oc) - radius*radius;
-	float discriminant = b*b - 4.0f*a*c;
-	return (discriminant > 0.0f);
-}*/
 
-/*__device__ vec3 color_f(const ray& r, hittable **world, curandState *local_rand_state) {
-	hit_record rec;
-	curandState a;
-	if ((*world)->hit(r, 0.001, infinity, rec, &a)) {
-		return 0.5f*vec3(rec.normal.x()+1, rec.normal.y() + 1.0f, rec.normal.z()+1.0f);
-	} else {
-		vec3 unit_direction = unit_vector(r.direction());
-		float t = 0.5f*(unit_direction.y() + 1.0f);
-		return (1.0f-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
-	}
-}*/
+
 
 __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
 	const vec3 background(0.7f, 0.8f, 1.0f);
@@ -73,36 +50,10 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 
 	if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered, local_rand_state))
 		return emitted;
-	//attenuation = vec3(0.5f, 0.5f, 0.5f);
-	//scattered = ray(rec.p, rec.normal+random_in_unit_sphere(local_rand_state));//ray(rec.p, rec.normal + random_in_unit_sphere(local_rand_state));
 	
 	return emitted + attenuation*color_f(scattered, world, local_rand_state, depth-1);	
 }
 
-/*__device__ vec3 color_f(const ray& r, hittable **world, curandState *local_rand_state, int depth) {
-	const vec3 background(0.7f, 0.8f, 1.0f);
-	ray current_ray = r;
-	vec3 current_attenuation = vec3(1.0f, 1.0f, 1.0f);
-	vec3 result = vec3(0.0f, 0.0f, 0.0f);
-	
-	while (depth > 0) {
-		hit_record rec;
-		if(world[0]->hit(current_ray, 0.001f, infinity, rec) ) {
-			color emittedColor = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-			ray scattered;
-			vec3 attenuation;
-			
-			if (rec.mat_ptr->scatter(r, rec, attenuation, scattered, local_rand_state) ) {
-
-			} else {
-
-			}
-		} else {
-			return emitted + current_attenuation*background;
-		}
-	}	
-	return vec3(0.0f, 0.0f, 0.0f);
-}*/
 
 __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -126,16 +77,12 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	for(int s=0; s < ns; s++) {
 		float u = float(i+random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
-		//ray r(origin,lower_left_corner + u*horizontal + v*vertical);
-
+		
 		ray r = (*cam)->get_ray(rand_state, u,v);
-		//col += color_f(r, world);
-
 		col += color_f(r, world, &local_rand_state, max_depth);
 	}
 
 	fb[pixel_index] = col/float(ns);
-	//fb[pixel_index] = vec3(random_float(rand_state, -1, 1),random_float(rand_state, -1, 1), random_float(rand_state, -1, 1));
 }
 
 
@@ -145,7 +92,7 @@ int main() {
 	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
 	const unsigned num_pixels = nx*ny;
-	const unsigned ns = 1000;	//rays per pixel
+	const unsigned ns = 100;	//rays per pixel
 
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
@@ -162,6 +109,7 @@ int main() {
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
 	
 	std::cerr << "\rCreating World" << std::flush;
+	//scene curr_scene = basic_scene(aspect_ratio);
 	//make our world of hittables and the camera
 	hittable **d_list;
 	checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	//2 because 2 hittables
@@ -174,7 +122,7 @@ int main() {
 	create_world<<<1,1>>>(d_list, d_world, d_camera);		//create_world is defined above
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-
+	
 	
 	//Render to the frame buffer
 	dim3 blocks(nx/tx+1, ny/ty+1);
@@ -201,7 +149,7 @@ int main() {
 	std::cerr << "\rCleaning Up" << std::flush;	
 	//clean up
 	checkCudaErrors(cudaDeviceSynchronize());
-	free_world<<<1,1>>>(d_list,d_world,d_camera);
+	free_world<<<1,1>>>(d_list,d_world,d_camera,2);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaFree(d_list));
 	checkCudaErrors(cudaFree(d_world));

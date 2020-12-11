@@ -24,8 +24,8 @@ struct sphere : public hittable {
 		//v: normalised angle around Z axis (from Y=-1 to Y=1)
 		// - normalised means in [0,1] as is standard for texture coordinates
 
-		const auto theta = acos(-p.y());			//theta and phi in standard spherical coordinates
-		const auto phi = atan2(-p.z(), p.x()) + pi;	//techically phi = atan2(p.z, -p.x) but this is discontinuous
+		const float theta = acosf(-p.y());			//theta and phi in standard spherical coordinates
+		const float phi = atan2f(-p.z(), p.x()) + pi;	//techically phi = atan2(p.z, -p.x) but this is discontinuous
 								// - this uses atan2(a, b) = atan2(-a,-b) + pi which is continuous
 								// - atan2(a,b) = atan(a/b)
 
@@ -38,16 +38,16 @@ __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, 
 	//using the quadratic equation to find if (and when) 'ray' collides with sphere centred at 'center' with radius 'radius'
 	
 	const vec3 oc = r.origin() - center;	
-	const auto a = r.direction().length_squared();
-	const auto half_b =  dot(oc, r.direction());	//uses half b to simplify the quadratic equation
-	const auto c = oc.length_squared() - radius * radius;
-	const auto discriminant = half_b*half_b - a*c;
+	const float a = r.direction().length_squared();
+	const float half_b =  dot(oc, r.direction());	//uses half b to simplify the quadratic equation
+	const float c = oc.length_squared() - radius * radius;
+	const float discriminant = half_b*half_b - a*c;
 
 	if (discriminant < 0) return false;	//if there is no collision
-	const auto sqrtd = sqrt(discriminant);
+	const float sqrtd = sqrtf(discriminant);
 
 	//Find the nearest root that lies in the acceptable range.
-	auto root = (-half_b - sqrtd) / a;	//first root
+	float root = (-half_b - sqrtd) / a;	//first root
 	if (root < t_min || t_max < root) {	//if the first root is ouside of the accepctable range
 		//if true, check the second root
 		root = (-half_b - sqrtd) / a;
