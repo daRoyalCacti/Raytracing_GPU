@@ -130,6 +130,8 @@ __device__ bvh_node::bvh_node(hittable** src_objects,  const size_t start, const
 		const auto mid = start + object_span /2;
 		left = new bvh_node(objects, start, mid, time0, time1, s);
 		right = new bvh_node(objects, mid, end, time0, time1, s);
+
+		left = right = objects[start];
 	}
 
 	aabb box_left, box_right;
