@@ -35,7 +35,7 @@ void write_frame_buffer(std::ostream &out, const color* f, const int width, cons
 	out << "P3\n" << width << " " << height << "\n255\n";
 	for (int j = height-1; j>=0; j--) 
 		for (int i = width-1; i >= 0; i--) {
-			const size_t pixel_index = j*width*no_fb + i;
+			//const size_t pixel_index = j*width*no_fb + i;
 
 			/*auto r = f[pixel_index].x();
 			auto g = f[pixel_index].y();

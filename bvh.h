@@ -1,147 +1,209 @@
-//is a tree of bounding boxes
 #pragma once
 
-//#include <algorithm>
-
 #include "common.h"
-
-#include <functional>
 
 #include "hittable.h"
 #include "hittable_list.h"
 #include "box.h"
 
-struct bvh_node : public hittable {
-	hittable *left;	//left and right nodes on the tree
-	hittable *right;
-	aabb box;			//the box for the current node
-
-	__device__ bvh_node();
-	__device__ bvh_node(hittable_list& list,  const float time0, const float time1, curandState *s) {
-		bvh_node(list.objects, 0, list.list_size, time0, time1, s);
-	}
-	__device__ bvh_node(hittable** src_objects, const size_t start, const size_t end, const float time0, const float time1, curandState *s);
-
-	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+struct node_info {
+	bool end;
+	int num, left, right, parent;
 };
 
-__device__ bool bvh_node::bounding_box(const float time0, const float time1, aabb& output_box) const {
-	output_box = box;
-	return true;
+#define cpu
+
+int num_bvh_nodes(int n) {
+	return pow(2, ceil(log2(n))) -1 +n;
 }
 
-__device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
-	if (!box.hit(r, t_min, t_max)) return false;	//if it didn't hit the large bounding box
+struct bvh_nodez : public hittable {
+#ifndef cpu
+	hittable* hittables;
+#endif
+	node_info* info;
+	int n;	//number of objects associated to the tree
 
-	const bool hit_left = left->hit(r, t_min, t_max, rec, s);	//did the ray hit the left hittable
-	const bool hit_right = right->hit(r, t_min, hit_left ? rec.t : t_max, rec, s);	//did the ray hit the right hittable
-											//if the ray hit the left, check to make sure it hit the right before the left
-											// - so rec is set correctly
-	return hit_left || hit_right;
-}
+	//__device__ bvh_node();
+#ifdef cpu
+	bvh_nodez(int num_obj);
+#else
+	__device__ bvh_nodez(int num_obj);
+#endif
 
-__device__ inline bool box_compare(const hittable* a, const hittable *b, const int axis) {
-	aabb box_a;
-	aabb box_b;
+#ifdef cpu
+	int num_nodes(){
+		return pow(2, ceil(log2(n))) -1 +n;
+	}
+#else
+	__device__ int num_nodes(){
+		return static_cast<int>(powf(2, ceilf(log2f(n)) ) -1 +n);
+	}
+#endif
 
-	if (!a->bounding_box(0,0,box_a) || !b->bounding_box(0,0,box_b))
-		return false;	//cannot cerr on GPU
-		//std::cerr << "No bouning box in bvh_node constructor.\n";
+#ifdef cpu
+	int index_at(int row, int col) {
+		return pow(2, row) - 1 + col;	
+	}
+#else
+	__device__ int index_at(int row, int col) {
+		return powf(2,row) - 1 + col;	
+	}
+#endif
 
-	return box_a.min().e[axis] < box_b.min().e[axis];
-}
-
-__device__ bool box_x_compare (const hittable* a, const hittable* b) {
-	return box_compare(a, b, 0);
-}
-
-
-__device__ inline bool box_y_compare (const hittable *a, const hittable *b) {
-	return box_compare(a, b, 1);
-}
-
-
-__device__ inline bool box_z_compare (const hittable *a, const hittable *b) {
-	return box_compare(a, b, 2);
-}
+#ifndef cpu
+	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
+	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+#endif
+};
 
 
-__device__ int  d_partition(hittable** arr, int low, int high, int axis) {
-	const auto comparator =   (axis==0) ? box_x_compare	//used to sort boxes into close and far to a given axis
-				: (axis==1) ? box_y_compare
-					    : box_z_compare;
+
+
+#ifdef cpu
+ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
+	 const int num_ne_rows = ceil(log2(n));
+	 info = new node_info[num_nodes()];
+#else
+__device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
+	const int num_ne_rows = ceilf(log2f(n));
+#endif
 	
-	auto pivot = arr[high];
-	auto i = low - 1;
+	int index;
+	int k;
+	//for tree nodes that are above the last 2 rows
+	bool first = true, left = true, right = false;
+	for (int row = 0; row < num_ne_rows -1; row++) {
+#ifdef cpu
+		for (int col = 0; col < pow(2, row); col++) {
+#else
+		for (int col = 0; col < powf(2, row); col++) {
+#endif
+			index = index_at(row, col);
+			if (first) {
+				first = false;
+				info[0].num = n;
+				info[0].left = 1;
+				info[0].right = 2;
+				info[0].parent = -1;	//no parent
+				info[0].end = false;
+				info[info[0].left].parent = 0;
+				info[info[0].right].parent = 0;
+			} else {
+#ifdef cpu
+				k = floor( info[ info[index].parent].num / 2.0f  );
+#else
+				k = floorf(info[ info[index].parent].num / 2.0f  );
+#endif
+				if (left) {
+					left = false;
+					right = true;
 
-	for (int j = low; j <= high - 1; j++) {
-		if (comparator(arr[j], pivot) ) {
-			i++;
-			auto temp = arr[i];
-			arr[i] = arr[j];
-			arr[j] = temp;
+					info[index].num = k;
+				} else if (right) {
+					right = false;
+					left = true;
+					info[index].num = k + (info[info[index].parent].num%2);
+				}
+
+				info[index].left = index_at(row + 1, 2*col);
+				info[index].right = index_at(row + 1, 2*col + 1);
+				info[index].end = false;
+
+				info[ info[index].left ].parent = index;
+				info[ info[index].right].parent = index;
+			}
 		}
 	}
-	auto temp = arr[i+1];
-	arr[i+1] = arr[high];
-	arr[high] = temp;
-	return i+1;
-}
 
-__device__ void d_sort(hittable** arr, int low, int high, int axis) {
-	if (low < high) {
-		auto pi = d_partition(arr, low, high, axis);
-		
-		d_sort(arr, low, pi-1, axis);
-		d_sort(arr, pi+1, high, axis);	
-	}
-}
+	//for second to last row and last row
+	int row = num_ne_rows-1;	//taking the last non end row
+	left = true;	//should always be true
+	right = false;	// -- just making sure
+#ifdef cpu
+	int counter = pow(2, num_ne_rows) - 1;	//total number of non-end nodes -- starting on the end row
+#else 
+	int counter = powf(2, num_ne_rows) -1;	//total number of non-end nodes -- starting on the end row
+#endif
 
-
-__device__ bvh_node::bvh_node(hittable** src_objects,  const size_t start, const size_t end, const float time0, const float time1, curandState *s) {
-	auto objects = src_objects;	//Create a modifiable array for the sorce scene objects
-
-	const auto axis = random_int(s,0,2);
-	const auto comparator =   (axis==0) ? box_x_compare	//used to sort boxes into close and far to a given axis
-				: (axis==1) ? box_y_compare
-					    : box_z_compare;
-	
-	const size_t object_span = end - start;		//the number of objects the node is conned to
-
-	if (object_span == 1) {		//only 1 object on node
-		//put the object in both left and right
-		left = right = objects[start];
-	} else if (object_span == 2) {	//2 objects on node
-
-		if (comparator(objects[start], objects[start+1])) {	//if the first object is closer to the random axis than the second object
-			left = objects[start];
-			right = objects[start+1];
+#ifdef cpu
+	for (int col = 0; col < pow(2, row); col++) {
+#else
+	for (int col = 0; col < powf(2, row); col++) {
+#endif
+		index = index_at(row, col);
+#ifdef cpu
+		k = floor( info[ info[index].parent].num / 2.0f  );
+#else
+		k = floorf(info[ info[index].parent].num / 2.0f  );
+#endif
+		if (left) {
+			left = false;
+			right = true;
+			info[index].num = k; 
+		} else if (right) {
+			right = false;
+			left = true;
+			info[index].num = k + (info[info[index].parent].num%2);
+		}
+		info[index].end = false;
+		if (info[index].num == 1) {	//1 object
+			info[index].left = counter;
+			info[index].right = counter;
+		} else if (info[index].num==2) {
+			info[index].left = counter;
+			info[index].right = ++counter;
 		} else {
-			left = objects[start+1];
-			right = objects[start];
+			std::cerr << "not second last row" << std::endl;
 		}
+		counter++;
 
-	} else {
-		//std::sort(objects[0] + start, objects[0] + end, comparator);
-		d_sort(objects, start, end, axis);
+		info[ info[index].left].parent = index;
+		info[ info[index].right].parent =index;
+
+		//switching now to last row
+		int old_index = index;
+		index = info[old_index].left;
+#ifdef cpu
+		k = floor( info[ info[index].parent].num / 2.0f  );
+#else
+		k = floorf(info[ info[index].parent].num / 2.0f  );
+#endif
+		if (k != 1) {
+			std::cerr << "last row does not contain 1 object" << std::endl;
+		}
 		
+		info[index].num = 1;
+		info[index].end = true;
+		info[index].left = -1;	//no children
+		info[index].right = -1;
 
-		const auto mid = start + object_span /2;
-		left = new bvh_node(objects, start, mid, time0, time1, s);
-		right = new bvh_node(objects, mid, end, time0, time1, s);
+		if (index != info[old_index].right) {	//for when a second last row node is connected to 2 last row nodes
+			index = info[old_index].right;
+#ifdef cpu
+			k = floor( info[ info[index].parent].num / 2.0f  );
+#else
+			k = floorf(info[ info[index].parent].num / 2.0f  );
+#endif
+			if (k != 1) {
+				std::cerr << "last row does not contain 1 object" << std::endl;
+			}
 
-		left = right = objects[start];
+			info[index].num = 1;
+			info[index].end = true;
+			info[index].left = -1;	//no children
+			info[index].right = -1;
+		}
 	}
-
-	aabb box_left, box_right;
-	
-	if (!left->bounding_box(time0, time1, box_left) || !right->bounding_box(time0, time1, box_right) )
-		return;	//cannot cerr on GPU
-		//std::cerr << "No bounding box in bvh_node constructor.\n";
-	
-	box = surrounding_box(box_left, box_right);
 }
 
 
+#ifndef cpu
+__device__ bool bvh_nodez::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
+	return false;
+}
+__device__ bool bvh_nodez::bounding_box(const float time0, const float time1, aabb& output_box) const {
+	return false;
+}
 
+#endif

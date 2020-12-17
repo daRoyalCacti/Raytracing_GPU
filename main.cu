@@ -121,6 +121,18 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 
 
 int main() {
+	bvh_nodez node(5);
+	//std::cerr << num_bvh_nodes(15) << std::endl;
+
+	for (int i = 0; i < num_bvh_nodes(node.n); i++) {
+		std::cerr << "For node " << i << "\n";
+		std::cerr << "\tEnd node:\t\t" << node.info[i].end << "\n";
+		std::cerr << "\tNumber of objects:\t" << node.info[i].num << "\n";
+		std::cerr << "\tLeft connection:\t" << node.info[i].left << "\n";
+		std::cerr << "\tRight connection:\t" << node.info[i].right << "\n";
+		std::cerr << "\tParent node:\t\t" << node.info[i].parent << "\n";
+	}
+/*
 	//start timing
 	const auto start = std::chrono::system_clock::now();
 	const std::time_t start_time = std::chrono::system_clock::to_time_t(start);
@@ -187,10 +199,6 @@ int main() {
 	}
 
 	
-
-	//std::cerr << "\rOutputting image              " << std::flush;
-	//write_frame_buffer("./output/test.ppm", fb, nx, ny, no_fb);
-	
 	std::cerr << "\rAveraging Frame Buffers         " << std::flush;
 	average_images("./output", "image.ppm");
 
@@ -210,6 +218,6 @@ int main() {
 
 	const std::chrono::duration<double> elapsed_seconds = end - start;
 	std::cerr << "Elapsed time: " << elapsed_seconds.count() << "s  or  " << elapsed_seconds.count() / 60.0f << "m  or  " << elapsed_seconds.count() / (60.0f * 60.0f) << "h\n";
-
+*/
 	return 0;
 }
