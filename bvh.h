@@ -154,7 +154,7 @@ __device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
 			info[index].left = counter;
 			info[index].right = ++counter;
 		} else {
-			std::cerr << "not second last row" << std::endl;
+			std::cerr << "not second last row: " << index << std::endl;
 		}
 		counter++;
 
@@ -169,8 +169,8 @@ __device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
 #else
 		k = floorf(info[ info[index].parent].num / 2.0f  );
 #endif
-		if (k != 1) {
-			std::cerr << "last row does not contain 1 object" << std::endl;
+		if (k+info[info[index].parent].num%2 != 1) {
+			std::cerr << "last row does not contain 1 object: " <<index << std::endl;
 		}
 		
 		info[index].num = 1;

@@ -124,14 +124,14 @@ int main() {
 	bvh_nodez node(5);
 	//std::cerr << num_bvh_nodes(15) << std::endl;
 
-	for (int i = 0; i < num_bvh_nodes(node.n); i++) {
+	/*for (int i = 0; i < num_bvh_nodes(node.n); i++) {
 		std::cerr << "For node " << i << "\n";
 		std::cerr << "\tEnd node:\t\t" << node.info[i].end << "\n";
 		std::cerr << "\tNumber of objects:\t" << node.info[i].num << "\n";
 		std::cerr << "\tLeft connection:\t" << node.info[i].left << "\n";
 		std::cerr << "\tRight connection:\t" << node.info[i].right << "\n";
 		std::cerr << "\tParent node:\t\t" << node.info[i].parent << "\n";
-	}
+	}*/
 /*
 	//start timing
 	const auto start = std::chrono::system_clock::now();
