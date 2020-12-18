@@ -17,18 +17,114 @@ int num_bvh_nodes(int n) {
 	return pow(2, ceil(log2(n))) -1 +n;
 }
 
-struct bvh_nodez : public hittable {
+
+//helper function to be used in merge sort
+#ifdef cpu
+template <typename T>
+T* merge(const T* A, int L1, int R1, int L2, int R2) {
+#else
+template <typename T>
+__device__ T* merge(const T* A, int L1, int R1, int L2, int R2) {
+#endif
+	//A array to be sorted
+	//L1 the start of the first part
+	//R1 the end of the first part
+	//L2 the start of the second part
+	//R2 the end of the second part
+	int index = 0;
+	T* temp = new T[R1 - L1 + R2 - L2+1];
+	
+	while (L1 <= R1 && L2 <= R2) {
+		if (A[L1] <= A[L2]) {
+			temp[index] = A[L1];
+			index++;
+			L1++;
+		} else {
+			temp[index] = A[L2];
+			index++;
+			L2++;
+		}
+	}
+
+	while (L1 <= R1) {	//if L2 <= R2 becomes flase, L1 <= R1 does not necessarily have to be false
+		temp[index] = A[L1];
+		index++;
+		L1++;
+	}
+
+	while (L2 <= R2) {
+		temp[index] = A[L2];
+		index++;
+		L2++;
+	}
+
+	return temp;	
+}
+
+#ifdef cpu
+template <typename T>
+void merge_sort(const T* A, int n, T* O) {
+#else
+template <typename T>
+__device__ void merge_sort(const T* A, int n, T* O) {
+#endif
+	//A input array
+	//n size of input array
+	//O output array
+	
+	//O = A;
+	
+	for (int k = 0; k < n; k++) { 
+		O[k] = A[k];
+		//std::cout << A[k] << std::endl;
+	}
+
+
+	int len = 1;
+	int i, L1, R1, L2, R2;
+	while (len < n) {
+		//std::cout << "len = " << len << std::endl;
+		i = 0;
+		while (i < n) {
+			//std::cout << "i = " << i << std::endl;
+			L1 = i;
+			R1 = i + len-1;
+			L2 = i + len;
+			R2 = i + 2*len - 1;
+
+			if (L2 >= n) 
+				break;
+
+			if (R2 >= n)
+				R2 = n-1;
+
+			auto temp = merge(O, L1, R1, L2, R2);
+			
+			for (int j=0; j < R2-L1+1; j++) { 
+				//std::cout << "i+j " << i+j << std::endl;
+				O[i+j] = temp[j];
+			}
+
+			i += 2*len;
+		}
+		len *= 2;
+	}
+}
+
+
+struct bvh_node : public hittable {
 #ifndef cpu
 	hittable* hittables;
+	__device__ bvh_node(hittable* hits, int num_obj, const float time0, const float time1, curandState *s);
 #endif
 	node_info* info;
 	int n;	//number of objects associated to the tree
 
 	//__device__ bvh_node();
 #ifdef cpu
-	bvh_nodez(int num_obj);
+	bvh_node(int num_obj);
 #else
-	__device__ bvh_nodez(int num_obj);
+	__device__ bvh_node(int num_obj);
 #endif
 
 #ifdef cpu
@@ -61,11 +157,11 @@ struct bvh_nodez : public hittable {
 
 
 #ifdef cpu
- bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
+ bvh_node::bvh_node(int num_obj) : n(num_obj) {
 	 const int num_ne_rows = ceil(log2(n));
 	 info = new node_info[num_nodes()];
 #else
-__device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
+__device__ bvh_node::bvh_node(int num_obj) : n(num_obj) {
 	const int num_ne_rows = ceilf(log2f(n));
 #endif
 	
@@ -154,7 +250,8 @@ __device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
 			info[index].left = counter;
 			info[index].right = ++counter;
 		} else {
-			std::cerr << "not second last row: " << index << std::endl;
+			printf("not second last row: %i\n", index);
+			//std::cerr << "not second last row: " << index << std::endl;
 		}
 		counter++;
 
@@ -170,7 +267,8 @@ __device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
 		k = floorf(info[ info[index].parent].num / 2.0f  );
 #endif
 		if (k+info[info[index].parent].num%2 != 1) {
-			std::cerr << "last row does not contain 1 object: " <<index << std::endl;
+			printf("last row does not contain 1 object: %i\n", index);
+			//std::cerr << "last row does not contain 1 object: " <<index << std::endl;
 		}
 		
 		info[index].num = 1;
@@ -186,7 +284,8 @@ __device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
 			k = floorf(info[ info[index].parent].num / 2.0f  );
 #endif
 			if (k != 1) {
-				std::cerr << "last row does not contain 1 object" << std::endl;
+				printf("last row does not contain 1 object: %i\n", index);
+				//std::cerr << "last row does not contain 1 object" << std::endl;
 			}
 
 			info[index].num = 1;
@@ -195,14 +294,20 @@ __device__ bvh_nodez::bvh_nodez(int num_obj) : n(num_obj) {
 			info[index].right = -1;
 		}
 	}
+
+
 }
 
 
 #ifndef cpu
-__device__ bool bvh_nodez::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
+__device__ bvh_node::bvh_node(hittable* hits, int  num_obj, const float time0, const float time1, curandState *s) : bvh_node(num_obj) {
+
+}
+
+__device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	return false;
 }
-__device__ bool bvh_nodez::bounding_box(const float time0, const float time1, aabb& output_box) const {
+__device__ bool bvh_node::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	return false;
 }
 

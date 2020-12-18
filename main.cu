@@ -121,7 +121,26 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 
 
 int main() {
-	bvh_nodez node(5);
+	/*
+	const size_t arr_size = 200;
+	float random_array[arr_size];
+	std::cout << "unsorted array\n";
+	for (int i = 0; i < arr_size; i++){
+		random_array[i] = (float)rand()/RAND_MAX;
+		std::cout << "\t" << random_array[i] << "\n";
+	}
+
+	float sorted_array[arr_size];
+	//sorted_array = random_array;
+	merge_sort(random_array, arr_size, sorted_array);
+
+	std::cout << "\nsorted array\n";
+	for (int i = 0; i < arr_size; i++) 
+		std::cout << "\t" << sorted_array[i] << "\n";
+
+	*/
+
+	//bvh_node node(3);
 	//std::cerr << num_bvh_nodes(15) << std::endl;
 
 	/*for (int i = 0; i < num_bvh_nodes(node.n); i++) {
