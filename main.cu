@@ -108,6 +108,7 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	vec3 col(0,0,0);
 	
 	for(int s=0; s < ns; s++) {
+		//printf("%i\n", s);
 		float u = float(i +random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
 		
@@ -121,37 +122,6 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 
 
 int main() {
-	/*
-	const size_t arr_size = 200;
-	float random_array[arr_size];
-	std::cout << "unsorted array\n";
-	for (int i = 0; i < arr_size; i++){
-		random_array[i] = (float)rand()/RAND_MAX;
-		std::cout << "\t" << random_array[i] << "\n";
-	}
-
-	float sorted_array[arr_size];
-	//sorted_array = random_array;
-	merge_sort(random_array, arr_size, sorted_array);
-
-	std::cout << "\nsorted array\n";
-	for (int i = 0; i < arr_size; i++) 
-		std::cout << "\t" << sorted_array[i] << "\n";
-
-	*/
-
-	//bvh_node node(3);
-	//std::cerr << num_bvh_nodes(15) << std::endl;
-
-	/*for (int i = 0; i < num_bvh_nodes(node.n); i++) {
-		std::cerr << "For node " << i << "\n";
-		std::cerr << "\tEnd node:\t\t" << node.info[i].end << "\n";
-		std::cerr << "\tNumber of objects:\t" << node.info[i].num << "\n";
-		std::cerr << "\tLeft connection:\t" << node.info[i].left << "\n";
-		std::cerr << "\tRight connection:\t" << node.info[i].right << "\n";
-		std::cerr << "\tParent node:\t\t" << node.info[i].parent << "\n";
-	}*/
-/*
 	//start timing
 	const auto start = std::chrono::system_clock::now();
 	const std::time_t start_time = std::chrono::system_clock::to_time_t(start);
@@ -161,10 +131,10 @@ int main() {
 	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
-	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
+	const unsigned rpfb = 10;	//number of rays per pixel to use in a given frame buffer
 	const unsigned no_fb = 10;	//number of frame buffers
 
-	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
+	const unsigned nx = 120;	//image width in frame buffer (also the output image size)
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
 
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
@@ -237,6 +207,6 @@ int main() {
 
 	const std::chrono::duration<double> elapsed_seconds = end - start;
 	std::cerr << "Elapsed time: " << elapsed_seconds.count() << "s  or  " << elapsed_seconds.count() / 60.0f << "m  or  " << elapsed_seconds.count() / (60.0f * 60.0f) << "h\n";
-*/
+
 	return 0;
 }
