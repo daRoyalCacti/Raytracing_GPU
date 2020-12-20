@@ -1,6 +1,5 @@
 #include <iostream>
 #include <chrono>
-#include <curand_kernel.h>
 
 #include "vec3.h"
 #include "ray.h"
@@ -9,50 +8,60 @@
 
 #include "hittable_list.h"
 
-//checking cuda errors
-#define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
-void check_cuda(cudaError_t result, const char* const func, const char* const file, const int line) {
-	if (result) {
-		std::cerr << "\nCUDA error = " << static_cast<unsigned>(result) << "\n\tin file: " << file << "\n\tat line: " << line << "\n\t in func" << func << "\n";
-		//Call CUDA Device Reset before exiting
-		cudaDeviceReset();
-		exit(99);
-	}
-}
+//for compiling purposes
+#include "color.h"
+#include "camera.h"
+#include "moving_sphere.h"
+#include "aarect.h"
+#include "box.h"
+#include "constant_medium.h"
+#include "bvh.h"
 
-__global__ void create_world(hittable **d_list, hittable **d_world) {
-	if (threadIdx.x == 0 && blockIdx.x == 0) {	//not need for parallism
-		*(d_list)   = new sphere(vec3(0,0,-1), 0.5);
-		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100);
+#include "scenes.h"
+
+
+__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		*(d_list)   = new sphere(vec3(0,0,-1), 0.5, new lambertian(vec3(0, 1, 0)));
+		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, new lambertian(vec3(0, 0, 1)));
 		*d_world    = new hittable_list(d_list,2);
+		*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
 	}
 }
 
-__global__ void free_world(hittable ** d_list, hittable **d_world) {
-	delete *(d_list);
-	delete *(d_list+1);
-	delete *d_world;
-}
 
-__device__ bool hit_sphere(const vec3& center, float radius, const ray& r) {
-	vec3 oc = r.origin() - center;
-	float a = dot(r.direction(), r.direction());
-	float b = 2.0f * dot(oc, r.direction());
-	float c = dot(oc, oc) - radius*radius;
-	float discriminant = b*b - 4.0f*a*c;
-	return (discriminant > 0.0f);
-}
 
-__device__ vec3 color_f(const ray& r, hittable **world) {
-	hit_record rec;
-	if ((*world)->hit(r, 0.001, infinity, rec)) {
-		return 0.5f*vec3(rec.normal.x()+1, rec.normal.y() + 1.0f, rec.normal.z()+1.0f);
-	} else {
-		vec3 unit_direction = unit_vector(r.direction());
-		float t = 0.5f*(unit_direction.y() + 1.0f);
-		return (1.0f-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
+
+__device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
+	ray cur_ray = r;
+	const vec3 background(0.7f, 0.8f, 1.0f);
+	color cur_attenuation(1,1,1);
+	color cur_col(1,1,1);
+
+	for (int i = 0; i < depth; i++) {
+		hit_record rec;
+
+		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
+			return cur_attenuation*background;
+
+		ray scattered;
+		color attenuation;
+		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+
+		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
+			cur_col = emitted + cur_attenuation*cur_col;
+			cur_attenuation *= attenuation;
+			cur_ray = scattered;
+		} else {
+			return cur_attenuation*emitted;
+		}
+
 	}
+	return color(0,0,0);	//exceeded recursion
+
+	//return emitted + attenuation*color_f(scattered, world, local_rand_state, depth-1);
 }
+
 
 __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -64,20 +73,25 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 	curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
 }
 
-__global__ void render(vec3* fb, int max_x, int max_y, int ns, vec3 lower_left_corner, vec3 horizontal, vec3 vertical, vec3 origin, curandState *rand_state,  hittable **world) {
+__global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, curandState *rand_state,  hittable **world, int max_depth, int id) {
+	//max_x for size of total image
+	//max_x2 for size of 1 frame buffer
+
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
 	int j = threadIdx.y + blockIdx.y * blockDim.y;
 	if((i >= max_x) || (j >= max_y)) return;	//if trying the work with more values than wanted
 	int pixel_index = j*max_x + i;
 
-	curandState local_rand_state = rand_state[pixel_index];
+	curandState local_rand_state = rand_state[(id*pixel_index + id)%(max_y*max_x)];
 	vec3 col(0,0,0);
 	
 	for(int s=0; s < ns; s++) {
-		float u = float(i+random_float(&local_rand_state)) / max_x;
+		//printf("%i\n", s);
+		float u = float(i +random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
-		ray r(origin,lower_left_corner + u*horizontal + v*vertical);
-		col += color_f(r, world);
+		
+		ray r = (*cam)->get_ray(rand_state, u,v);
+		col += color_f(r, world, &local_rand_state, max_depth);
 	}
 
 	fb[pixel_index] = col/float(ns);
@@ -86,69 +100,91 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, vec3 lower_left_c
 
 
 int main() {
-	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
-	const double aspect_ratio = 16.0 / 9.0;
-	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
-	const unsigned num_pixels = nx*ny;
-	const unsigned ns = 100;	//rays per pixel
+	//start timing
+	const auto start = std::chrono::system_clock::now();
+	const std::time_t start_time = std::chrono::system_clock::to_time_t(start);
+	std::cerr << "Computation started at " << std::ctime(&start_time);
 
+
+	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
+	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
+	const unsigned no_fb = 10;	//number of frame buffers
+	
+	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
+	
+	const unsigned ns = rpfb*no_fb;	//rays per pixel
 
+	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
+	const unsigned num_pixels = nx*ny;
+
+
+
+	std::cerr << "Generating a " << nx << "x" << ny << " image with " << ns << " rays per pixel\n";
+	std::cerr << "using " << tx << "x" << ty << " blocks and " << no_fb << " frame buffers.\n";
+
+
+
+	std::cerr << "Allocating Frame Buffer" << std::flush;
 	//Frame buffer (holds the image in the GPU)
 	vec3 *fb;
-	const size_t fb_size = num_pixels*sizeof(vec3);	
+	const size_t fb_size = num_pixels*sizeof(vec3)*no_fb;	
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
+	
+	std::cerr << "\rCreating World                " << std::flush;
+	big_scene1 curr_scene;
 
-	//make our world of hittables
-	hittable **d_list;
-	checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	//2 because 2 hittables
-	hittable **d_world;
-	checkCudaErrors(cudaMalloc((void**)&d_world, sizeof(hittable *) ));
-	create_world<<<1,1>>>(d_list, d_world);		//create_world is defined above
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-
+	
+	
 	//Render to the frame buffer
-	dim3 blocks(nx/tx+1, ny/ty+1);
+	dim3 blocks(nx*no_fb/tx+1, ny/ty+1);	//making the frame buffer exceptionally long to combine the multiple frame buffers
 	dim3 threads(tx, ty);
 	curandState *d_rand_state;
-	checkCudaErrors(cudaMalloc((void**)&d_rand_state, num_pixels*sizeof(curandState) ));
+	checkCudaErrors(cudaMalloc((void**)&d_rand_state, num_pixels*no_fb*sizeof(curandState) ));
 
+
+
+	std::cerr << "\rIntialising the render        " << std::flush;
 	render_init<<<blocks, threads>>>(nx, ny, d_rand_state);		//initialising the render -- currently just setting up the random numbers
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
-
-	render<<<blocks, threads>>>(fb, nx, ny, ns,	//render is a function defined above
-					vec3(-2.0, -1.0, -1.0),
-					vec3(4.0, 0.0, 0.0),
-					vec3(0.0, 2.0, 0.0),
-					vec3(0.0, 0.0, 0.0),
-					d_rand_state,
-					d_world);		
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());	//lets the CUP that the GPU is done rendering
-
-	//Ouput FB as Image
-	std::cout << "P3\n" << nx << " " << ny << "\n255\n";
-	for (int j = ny-1; j>=0; j--) 
-		for (int i = 0; i < nx; i++) {
-			const size_t pixel_index = j*nx + i;
-			
-			const int ir = int(255.99*fb[pixel_index].x() );
-			const int ig = int(255.99*fb[pixel_index].y() );
-			const int ib = int(255.99*fb[pixel_index].z() );
-
-			std::cout << ir << " " << ig << " " << ib << "\n";
-		}
 	
+
+
+	for (int i = 0; i < no_fb; i++) {
+		std::cerr << "\rRendering to frame buffer " << i+1 << "/" << no_fb << "         "  << std::flush;
+		render<<<blocks, threads>>>(fb, nx, ny, rpfb,	//render is a function defined above
+						curr_scene.d_camera,
+						d_rand_state,
+						curr_scene.d_world, 50, i);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tells the CPU that the GPU is done rendering
+		write_frame_buffer("output/" + std::to_string(i) + ".ppm", fb, nx, ny);
+	}
+
+	
+	std::cerr << "\rAveraging Frame Buffers         " << std::flush;
+	average_images("./output", "image.ppm");
+
+
+
+	std::cerr << "\rCleaning Up                   " << std::flush;	
 	//clean up
 	checkCudaErrors(cudaDeviceSynchronize());
-	free_world<<<1,1>>>(d_list,d_world);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaFree(d_list));
-	checkCudaErrors(cudaFree(d_world));
+
 	checkCudaErrors(cudaFree(fb));
+
+
+	//end timing
+	const auto end = std::chrono::system_clock::now();
+	const std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+	std::cerr << "\rComputation ended at " << std::ctime(&end_time) << "                ";
+
+	const std::chrono::duration<double> elapsed_seconds = end - start;
+	std::cerr << "Elapsed time: " << elapsed_seconds.count() << "s  or  " << elapsed_seconds.count() / 60.0f << "m  or  " << elapsed_seconds.count() / (60.0f * 60.0f) << "h\n";
 
 	return 0;
 }
