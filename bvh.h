@@ -371,12 +371,12 @@ test_goto_point:
 	aabb temp_box1, temp_box2;
 	for (int node = index_at(num_ne_rows - 1, 0); node < index_at(num_ne_rows,0); node++) {
 		if (info[node].num == 1) {
-			objs[info[info[node].left].ids[0]]->bounding_box(0, 0, bounds[node]);
+			objs[info[info[node].left].ids[0]]->bounding_box(time0, time1, bounds[node]);
 			//printf("%f\n", objs[info[node].left.ids[0]]->radius);
 			//printf("1, %i\n", info[info[node].left].ids[0]);
 		} else {
-			objs[info[info[node].left].ids[0]]->bounding_box(0,0, temp_box1);
-			objs[info[info[node].right].ids[0]]->bounding_box(0,0, temp_box2);
+			objs[info[info[node].left].ids[0]]->bounding_box(time0,time1, temp_box1);
+			objs[info[info[node].right].ids[0]]->bounding_box(time0, time1, temp_box2);
 			bounds[node] = surrounding_box(temp_box1, temp_box2);
 			//printf("2, %i %i\n", info[info[node].left].ids[0], info[info[node].right].ids[0]);
 		}
