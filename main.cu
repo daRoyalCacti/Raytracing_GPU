@@ -135,6 +135,7 @@ int main() {
 	const unsigned no_fb = 10;	//number of frame buffers
 
 	const unsigned nx = 120;	//image width in frame buffer (also the output image size)
+	
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
 
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);

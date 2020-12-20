@@ -228,11 +228,11 @@ struct big_scene1 : public scene {
 
 #ifdef testing
 		hittable** d_list_temp;
-		checkCudaErrors(cudaMalloc( (void**)&d_list_temp, 488*sizeof(hittable*)*10 ));
+		checkCudaErrors(cudaMalloc( (void**)&d_list_temp, 488*sizeof(hittable*) ));
 			
-		checkCudaErrors(cudaMalloc((void**)&d_list, size_of_bvh(22*22+4)*10 ));
+		checkCudaErrors(cudaMalloc((void**)&d_list, size_of_bvh(22*22+4) ));
 
-		checkCudaErrors(cudaMalloc((void**)&d_world, size_of_bvh(22*22+4) ));
+		checkCudaErrors(cudaMalloc((void**)&d_world, sizeof(hittable) )); //size_of_bvh(22*22+4) ));
 
 		no_hittables = 1;
 		create_big_world1<<<1,1>>>(d_list, d_world, d_camera, rand_state, d_list_temp);

@@ -340,6 +340,7 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 						info[info[node].left].ids[counterl++] = info[node].ids[j];
 						//should_break = true;
 						//break;
+						//printf("axis = %i, node = %i, obj = %i, info = %i, i = %i, j = %i, counterl = %i, counterr = %i, counter = %i\n", axis, node, obj_s[axis][i], info[node].ids[j], i, j, counterl, counterr, counter);
 						counter++;
 						goto test_goto_point;
 					} else {
@@ -347,6 +348,7 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 						info[info[node].right].ids[counterr++] = info[node].ids[j];
 						//should_break = true;
 						//break;
+						//printf("axis = %i, node = %i, obj = %i, info = %i, i = %i, j = %i, counterl = %i, counterr = %i, counter = %i\n", axis, node, obj_s[axis][i], info[node].ids[j], i, j, counterl, counterr, counter);
 						counter++;
 						goto test_goto_point;
 					}
@@ -378,12 +380,13 @@ test_goto_point:
 			bounds[node] = surrounding_box(temp_box1, temp_box2);
 			//printf("2, %i %i\n", info[info[node].left].ids[0], info[info[node].right].ids[0]);
 		}
-		printf("\n (%f, %f, %f),   (%f, %f, %f)\n", bounds[node].min().x(), bounds[node].min().y(), bounds[node].min().z(), bounds[node].max().x(), bounds[node].max().y(), bounds[node].max().z() );
+		//printf("\n (%f, %f, %f),   (%f, %f, %f)\n", bounds[node].min().x(), bounds[node].min().y(), bounds[node].min().z(), bounds[node].max().x(), bounds[node].max().y(), bounds[node].max().z() );
 	}
 
 	//for the rest of the rows
-	for (int node = index_at(num_ne_rows - 2, 0); node <= 0; node++) {	//running through the rest of the nodes backwards
+	for (int node = index_at(num_ne_rows - 1, 0) - 1; node >= 0; node--) {	//running through the rest of the nodes backwards
 		bounds[node] = surrounding_box(bounds[info[node].left], bounds[info[node].right]);
+		//printf("\n (%f, %f, %f),   (%f, %f, %f)\n", bounds[node].min().x(), bounds[node].min().y(), bounds[node].min().z(), bounds[node].max().x(), bounds[node].max().y(), bounds[node].max().z() );
 	}
 
 	//const int index =index_at(num_ne_rows - 2, 0);
@@ -426,19 +429,23 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 		//printf("%i\n", current_index);
 
 		if (info[current_index].end) {	//if at an end node
+			//printf("reached an end node\n");
 			if (info[info[current_index].parent].num == 1) {
 				if (objs[info[current_index].ids[0]]->hit(r, t_min, t_max, temp_rec, s) ) {	//if an end node is hit
 					if (temp_rec.t < current_hit_time) {
 						current_hit_time = temp_rec.t;
 						rec = temp_rec;
 						once_hit = true;
-					} else {	//there was a hit but it was after the current hit
+						//printf("a hit");
+					}
+					/*} else {	//there was a hit but it was after the current hit
 						row_cntr--;		//move up 
 						col_cntr[row_cntr]++;	//and across
 					}
 				} else {	//there was no hit
 					row_cntr--;		//move up
 					col_cntr[row_cntr]++;	//and across
+				}*/
 				}
 			} else {	//currently checking an end node that has 2 objects attacted to the parent node
 				if (objs[info[current_index].ids[0]]->hit(r, t_min, t_max, temp_rec, s) ) {
@@ -446,6 +453,7 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 						current_hit_time = temp_rec.t;
 						rec = temp_rec;
 						once_hit = true;
+						//printf("a hit");
 					} 
 				}
 				if (objs[info[current_index].ids[1]]->hit(r, t_min, t_max, temp_rec, s) ) {
@@ -453,28 +461,47 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 						current_hit_time = temp_rec.t;
 						rec = temp_rec;
 						once_hit = true;
-					} else {
+						//printf("a hit");
+					}
+					/*} else {
 						row_cntr--;		//move up
 						col_cntr[row_cntr]++;	//and across
-					}
+					}*/
 				}
 
 			}
+
+			//done checking end nodes
+			// time to move back to regular nodes
+			row_cntr--;	//moving up
+			if (lr[row_cntr] == 0) {	//at the first child node
+				lr[row_cntr] = 1;	
+				col_cntr[row_cntr]++;	//move to the second child node
+			} else {	//at the second child node
+				lr[row_cntr] = 0;	//resetting the variable
+				while (lr[--row_cntr] == 1) {//keep moving up until get back to a left node
+					lr[row_cntr] = 0;	//resetting the variable
+				}						
+				col_cntr[row_cntr]++;
+			}
 		} else {	//not an end node
 			if (bounds[current_index].hit(r, t_min, t_max) ) {	//ray hit a bounding box
-				printf("a hit!\n");
+				//printf("a hit!\n");
 				row_cntr++;	//move down a row
-				col_cntr[row_cntr] = info[current_index].left;
+				col_cntr[row_cntr] = info[current_index].left - index_at(row_cntr, 0);
+				//printf("hit : (%i, %i)\n", row_cntr, col_cntr[row_cntr]);
 			} else { 	//ray did not hit a bounding box
 				if (lr[row_cntr] == 0) {	//at the first child node
 					lr[row_cntr] = 1;	
 					col_cntr[row_cntr]++;	//move to the second child node
+					//printf("no hit : (%i, %i)\n", row_cntr, col_cntr[row_cntr]);
 				} else {	//at the second child node
 					lr[row_cntr] = 0;	//resetting the variable
 					while (lr[--row_cntr] == 1) {//keep moving up until get back to a left node
 						lr[row_cntr] = 0;	//resetting the variable
 					}						
 					col_cntr[row_cntr]++;
+					//printf("no hit : (%i, %i)\n", row_cntr, col_cntr[row_cntr]);
 				}
 			}
 		}
@@ -491,7 +518,9 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 	delete [] col_cntr;
 #endif
 	//printf("%i\n", once_hit);
+	//printf("row: %i,  col: %i\n", row_cntr, col_cntr[row_cntr]);
 	if (once_hit) {
+		//printf("hazzar");
 		return true;
 	} else {
 		return false;

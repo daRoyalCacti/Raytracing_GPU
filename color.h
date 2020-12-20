@@ -139,6 +139,7 @@ void average_images(std::string file_dir, std::string output_loc) {
 			int line_counter = 0;
 			while (getline (input,line)) {	//reading in each line in the file
 				line_counter++;
+				//std::cout << "file : " << entry.path() << "\nline = " << line_counter << std::endl;
 
 				if (first_file && line_counter == 2) {	//this line holds the image dimensions
 					//setting img_w and img_h
