@@ -32,28 +32,6 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
 
 
-/*
-__device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
-	const vec3 background(0.7f, 0.8f, 1.0f);
-
-	hit_record rec;
-
-	if (depth <= 0)
-		return color(0,0,0);
-	
-	if (!(*world)->hit(r, 0.001f, infinity, rec, local_rand_state)) 
-		return background;
-
-	ray scattered;
-	color attenuation;
-	const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-
-	if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered, local_rand_state))
-		return emitted;
-	
-	return emitted + attenuation*color_f(scattered, world, local_rand_state, depth-1);	
-}*/
-
 __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
 	ray cur_ray = r;
 	const vec3 background(0.7f, 0.8f, 1.0f);
@@ -108,6 +86,7 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	vec3 col(0,0,0);
 	
 	for(int s=0; s < ns; s++) {
+		//printf("%i\n", s);
 		float u = float(i +random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
 		
@@ -121,37 +100,6 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 
 
 int main() {
-	/*
-	const size_t arr_size = 200;
-	float random_array[arr_size];
-	std::cout << "unsorted array\n";
-	for (int i = 0; i < arr_size; i++){
-		random_array[i] = (float)rand()/RAND_MAX;
-		std::cout << "\t" << random_array[i] << "\n";
-	}
-
-	float sorted_array[arr_size];
-	//sorted_array = random_array;
-	merge_sort(random_array, arr_size, sorted_array);
-
-	std::cout << "\nsorted array\n";
-	for (int i = 0; i < arr_size; i++) 
-		std::cout << "\t" << sorted_array[i] << "\n";
-
-	*/
-
-	//bvh_node node(3);
-	//std::cerr << num_bvh_nodes(15) << std::endl;
-
-	/*for (int i = 0; i < num_bvh_nodes(node.n); i++) {
-		std::cerr << "For node " << i << "\n";
-		std::cerr << "\tEnd node:\t\t" << node.info[i].end << "\n";
-		std::cerr << "\tNumber of objects:\t" << node.info[i].num << "\n";
-		std::cerr << "\tLeft connection:\t" << node.info[i].left << "\n";
-		std::cerr << "\tRight connection:\t" << node.info[i].right << "\n";
-		std::cerr << "\tParent node:\t\t" << node.info[i].parent << "\n";
-	}*/
-/*
 	//start timing
 	const auto start = std::chrono::system_clock::now();
 	const std::time_t start_time = std::chrono::system_clock::to_time_t(start);
@@ -163,13 +111,13 @@ int main() {
 	const unsigned ty = 8; 	//threads of tx*ty threads
 	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
 	const unsigned no_fb = 10;	//number of frame buffers
-
+	
 	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
+	
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
 
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
 	const unsigned num_pixels = nx*ny;
-	//const unsigned no_fb = static_cast<unsigned>(float(ns)/rpfb+1);
 
 
 
@@ -237,6 +185,6 @@ int main() {
 
 	const std::chrono::duration<double> elapsed_seconds = end - start;
 	std::cerr << "Elapsed time: " << elapsed_seconds.count() << "s  or  " << elapsed_seconds.count() / 60.0f << "m  or  " << elapsed_seconds.count() / (60.0f * 60.0f) << "h\n";
-*/
+
 	return 0;
 }

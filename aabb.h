@@ -106,13 +106,13 @@ struct aabb {
 };
 
 __device__ inline aabb surrounding_box(const aabb box0, const aabb box1) {		//creates a larger bounding box around 2 smaller bounding boxes
-	const point3 small(	min(box0.min().x(),  box1.min().x()),
-				min(box0.min().y(),  box1.min().y()),
-				min(box0.min().z(),  box1.min().z()) );
+	const point3 small(	fminf(box0.min().x(),  box1.min().x()),
+				fminf(box0.min().y(),  box1.min().y()),
+				fminf(box0.min().z(),  box1.min().z()) );
 
-	const point3 big(	max(box0.max().x(),  box1.max().x()),
-				max(box0.max().y(),  box1.max().y()),
-				max(box0.max().z(),  box1.max().z()) );
+	const point3 big(	fmaxf(box0.max().x(),  box1.max().x()),
+				fmaxf(box0.max().y(),  box1.max().y()),
+				fmaxf(box0.max().z(),  box1.max().z()) );
 
 	return aabb(small, big);
 

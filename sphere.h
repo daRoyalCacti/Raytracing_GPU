@@ -76,5 +76,7 @@ __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, 
 
 __device__ bool sphere::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	output_box = aabb(center - vec3(radius, radius, radius), center + vec3(radius, radius, radius));
+	//printf("\n%f, %f\n", output_box.min().x(), output_box.max().x() );
+	//printf("\n%f\n", center);
 	return true;
 }

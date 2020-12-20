@@ -39,6 +39,12 @@ struct scene {
 	hittable **d_world;
 	camera   **d_camera;	
 
+	scene(float a, background_color bc) : aspect(a) {
+		set_background(bc);
+		checkCudaErrors(cudaMalloc((void**)&d_world, sizeof(hittable) ));
+		checkCudaErrors(cudaMalloc((void**)&d_camera, sizeof(camera*) ));
+	}
+
 	scene(float a, int h, background_color bc) : aspect(a), no_hittables(h) {
 		set_background(bc);
 
@@ -67,8 +73,6 @@ struct scene {
 		}
 	}
 
-
-	//__global__ virtual void create_world(hittable **d_list, hittable **d_world, camera **d_camera);
 };
 
 
@@ -130,14 +134,8 @@ struct first_scene : public scene {
 };
 
 
-
-
-__global__ void create_big_world1(hittable **d_list, hittable **d_world, camera **d_camera, curandState* rs) {
+__global__ void create_big_world1(hittable **d_list1, hittable **d_world, camera **d_camera, curandState* rs, hittable **d_list) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
-		//hittable **d_list;
-		//*d_list = new hittable[488];
-
-		//hittable_list **obj;
 
 		int counter = 0;
 
@@ -188,7 +186,8 @@ __global__ void create_big_world1(hittable **d_list, hittable **d_world, camera 
 		const auto material3 = new metal(color(0.7, 0.6, 0.5), 0.0);
 		d_list[counter++] = new sphere(point3(4, 1, 0), 1.0f, material3);
 		
-		*d_world = new hittable_list(d_list, 488);
+		*d_list1 = new bvh_node(d_list, 488, 0, 1, rs);
+		*d_world = new hittable_list(d_list1, 1);
 
 
 		*d_camera   = new camera(vec3(13.0f,2.0f,-3.0f), vec3(0.0f,0.0f,0.0f), vec3(0,1,0), 20, 16.0f/9.0f, 0.1f, 10.0f, 0, 1 );
@@ -198,7 +197,7 @@ __global__ void create_big_world1(hittable **d_list, hittable **d_world, camera 
 
 
 struct big_scene1 : public scene {
-	big_scene1() : scene(16.0f/9.0f, 488, background_color::sky) {
+	big_scene1() : scene(16.0f/9.0f, background_color::sky) {
 		curandState* rand_state;
 		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
 
@@ -206,8 +205,14 @@ struct big_scene1 : public scene {
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
+		hittable** d_list_temp;
+		checkCudaErrors(cudaMalloc( (void**)&d_list_temp, 488*sizeof(hittable*) ));
+			
+		checkCudaErrors(cudaMalloc((void**)&d_list, size_of_bvh(22*22+4) ));
 
-		create_big_world1<<<1,1>>>(d_list, d_world, d_camera, rand_state);		
+		no_hittables = 1;
+		create_big_world1<<<1,1>>>(d_list, d_world, d_camera, rand_state, d_list_temp);
+
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}
