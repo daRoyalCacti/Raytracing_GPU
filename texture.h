@@ -89,7 +89,7 @@ struct marble_texture : public texturez {
 	}
 	
 	__device__ virtual color value(const float u, const float v, const point3& p) const override {
-		return color(1,1,1) * 0.5 * (1 + sin(scale*p.z() + 10* noise.turb(scale*p, 7) ) );
+		return color(1,1,1) * 0.5 * (1 + sinf(scale*p.z() + 10* noise.turb(scale*p, 7) ) );
 	}
 };
 

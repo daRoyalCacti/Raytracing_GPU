@@ -48,6 +48,7 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 		color attenuation;
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
 
+		
 		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
 			cur_col = emitted + cur_attenuation*cur_col;
 			cur_attenuation *= attenuation;
@@ -55,6 +56,7 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 		} else {
 			return cur_attenuation*emitted;
 		}
+
 
 	}
 	return color(0,0,0);	//exceeded recursion
@@ -133,7 +135,7 @@ int main() {
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
 	
 	std::cerr << "\rCreating World                " << std::flush;
-	big_scene1 curr_scene;
+	two_perlin_spheres_scene curr_scene;
 
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created

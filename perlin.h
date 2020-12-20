@@ -68,6 +68,10 @@ class perlin {
 			ranvec[i] = unit_vector(vec3::random(s, -1,1));
 		}
 
+		perm_x = new int[point_count];
+		perm_y = new int[point_count];
+		perm_z = new int[point_count];
+
 		perm_x = perlin_generate_perm(s);
 		perm_y = perlin_generate_perm(s);
 		perm_z = perlin_generate_perm(s);

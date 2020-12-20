@@ -201,7 +201,7 @@ struct big_scene1 : public scene {
 		curandState* rand_state;
 		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
 
-		world_init<<<1,1>>>(rand_state);
+		world_init<<<1,1>>>(rand_state);	//intialising rand_state
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
@@ -218,3 +218,54 @@ struct big_scene1 : public scene {
 	}
 };
 
+
+__global__ void create_two_spheres_world(hittable **d_list, hittable **d_world, camera **d_camera) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		const auto checker = new checker_texture(color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+
+		d_list[0] = new sphere(point3(0,-10,0), 10, new lambertian(checker) );
+		d_list[1] = new sphere(point3(0, 10,0), 10, new lambertian(checker) );
+		
+		*d_world    = new hittable_list(d_list, 2);
+		*d_camera   = new camera(vec3(13.0f, 2.0f, 3.0f), vec3(0.0f,0.0f,0.0f), vec3(0,1,0), 20, 16.0f/9.0f, 0.1f, 10.0f, 0, 1 );
+	}
+}
+
+struct two_spheres_scene : public scene {
+	two_spheres_scene() : scene(16.0f/9.0f, 2, background_color::sky) {
+		create_two_spheres_world<<<1,1>>>(d_list, d_world, d_camera);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+	}
+};
+
+
+
+
+__global__ void create_two_perlin_spheres_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState *s) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		const auto pertex1 = new marble_texture(s, 4);
+		const auto pertex2 = new turbulent_texture(s, 5);
+
+		d_list[0] = new sphere(point3(0,-1000,0), 1000, new lambertian(pertex1) );
+		d_list[1] = new sphere(point3(0,    2,0),    2, new lambertian(pertex2) );
+
+		*d_world    = new hittable_list(d_list, 2);
+		*d_camera   = new camera(vec3(13.0f, 2.0f, 3.0f), vec3(0.0f,0.0f,0.0f), vec3(0,1,0), 20, 16.0f/9.0f, 0.1f, 10.0f, 0, 1 );
+	}
+}
+
+struct two_perlin_spheres_scene : public scene {
+	two_perlin_spheres_scene() : scene(16.0f/9.0f, 2, background_color::sky) {
+		curandState* rand_state;
+		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
+		
+		world_init<<<1,1>>>(rand_state);	//intialising rand_state
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+		create_two_perlin_spheres_world<<<1,1>>>(d_list, d_world, d_camera, rand_state);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+	}
+};
