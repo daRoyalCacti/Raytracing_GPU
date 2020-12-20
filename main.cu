@@ -131,10 +131,10 @@ int main() {
 	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
-	const unsigned rpfb = 10;	//number of rays per pixel to use in a given frame buffer
+	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
 	const unsigned no_fb = 10;	//number of frame buffers
-
-	const unsigned nx = 120;	//image width in frame buffer (also the output image size)
+	
+	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
 	
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
 

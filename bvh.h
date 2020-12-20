@@ -397,9 +397,9 @@ test_goto_point:
 __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	
 #ifdef newa
-	int* lr = new int[ceilf(log2f(n))];	//number of non end rows
+	//int* lr = new int[ceilf(log2f(n))];	//number of non end rows
 #else
-	int* lr;
+	//int* lr;
 #endif
 
 	
@@ -413,7 +413,7 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 
 	for (int i = 0; i < sizeof(col_cntr)/sizeof(int); i++) {
 		col_cntr[i] = 0;
-		lr[i] = 0;
+		//lr[i] = 0;
 	}
 
 	bool end = false;
@@ -456,7 +456,7 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 						//printf("a hit");
 					} 
 				}
-				if (objs[info[current_index].ids[1]]->hit(r, t_min, t_max, temp_rec, s) ) {
+				if (objs[info[current_index+1].ids[0]]->hit(r, t_min, t_max, temp_rec, s) ) {
 					if (temp_rec.t < current_hit_time) {
 						current_hit_time = temp_rec.t;
 						rec = temp_rec;
@@ -474,14 +474,16 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 			//done checking end nodes
 			// time to move back to regular nodes
 			row_cntr--;	//moving up
-			if (lr[row_cntr] == 0) {	//at the first child node
-				lr[row_cntr] = 1;	
+			//if (lr[row_cntr] == 0) {	//at the first child node
+			if (col_cntr[row_cntr] %2 == 0) {
+				//lr[row_cntr] = 1;	
 				col_cntr[row_cntr]++;	//move to the second child node
 			} else {	//at the second child node
-				lr[row_cntr] = 0;	//resetting the variable
-				while (lr[--row_cntr] == 1) {//keep moving up until get back to a left node
-					lr[row_cntr] = 0;	//resetting the variable
-				}						
+				//lr[row_cntr] = 0;	//resetting the variable
+				//while (lr[--row_cntr] == 1) {//keep moving up until get back to a left node
+				//	lr[row_cntr] = 0;	//resetting the variable
+				//}	
+				while (col_cntr[--row_cntr]%2==1) {}				
 				col_cntr[row_cntr]++;
 			}
 		} else {	//not an end node
@@ -491,15 +493,17 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 				col_cntr[row_cntr] = info[current_index].left - index_at(row_cntr, 0);
 				//printf("hit : (%i, %i)\n", row_cntr, col_cntr[row_cntr]);
 			} else { 	//ray did not hit a bounding box
-				if (lr[row_cntr] == 0) {	//at the first child node
-					lr[row_cntr] = 1;	
+				//if (lr[row_cntr] == 0) {	//at the first child node
+				if (col_cntr[row_cntr]%2 == 0) {
+					//lr[row_cntr] = 1;	
 					col_cntr[row_cntr]++;	//move to the second child node
 					//printf("no hit : (%i, %i)\n", row_cntr, col_cntr[row_cntr]);
 				} else {	//at the second child node
-					lr[row_cntr] = 0;	//resetting the variable
-					while (lr[--row_cntr] == 1) {//keep moving up until get back to a left node
-						lr[row_cntr] = 0;	//resetting the variable
-					}						
+					//lr[row_cntr] = 0;	//resetting the variable
+					//while (lr[--row_cntr] == 1) {//keep moving up until get back to a left node
+					//	lr[row_cntr] = 0;	//resetting the variable
+					//}	
+					while(col_cntr[--row_cntr]%2 == 1) {}					
 					col_cntr[row_cntr]++;
 					//printf("no hit : (%i, %i)\n", row_cntr, col_cntr[row_cntr]);
 				}
@@ -507,14 +511,14 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 		}
 
 
-		if (col_cntr[row_cntr] > powf(2, row_cntr)) {
+		if (col_cntr[row_cntr] >= powf(2, row_cntr)) {
 			end = true;
 		}
 	}
 
 
 #ifdef newa
-	delete [] lr;
+	//delete [] lr;
 	delete [] col_cntr;
 #endif
 	//printf("%i\n", once_hit);
