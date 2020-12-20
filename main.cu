@@ -32,28 +32,6 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
 
 
-/*
-__device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
-	const vec3 background(0.7f, 0.8f, 1.0f);
-
-	hit_record rec;
-
-	if (depth <= 0)
-		return color(0,0,0);
-	
-	if (!(*world)->hit(r, 0.001f, infinity, rec, local_rand_state)) 
-		return background;
-
-	ray scattered;
-	color attenuation;
-	const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-
-	if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered, local_rand_state))
-		return emitted;
-	
-	return emitted + attenuation*color_f(scattered, world, local_rand_state, depth-1);	
-}*/
-
 __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
 	ray cur_ray = r;
 	const vec3 background(0.7f, 0.8f, 1.0f);
@@ -140,7 +118,6 @@ int main() {
 
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
 	const unsigned num_pixels = nx*ny;
-	//const unsigned no_fb = static_cast<unsigned>(float(ns)/rpfb+1);
 
 
 
