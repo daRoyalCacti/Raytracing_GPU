@@ -3,7 +3,7 @@
 #include "common.h"
 
 #include "perlin.h"
-#include "stb_image_ne.h"
+
 
 struct texturez {
 	//int n;
@@ -97,13 +97,13 @@ struct marble_texture : public texturez {
 
 
 
-class image_texture : public texturez {
+struct image_texture : public texturez {
 	unsigned char* data;	//the data read from file
 	int width, height;	//the width and height of the image
 	int bytes_per_scanline;
+	int index = 0;	//index where the texture starts
 
-	public:
-	const static int bytes_per_pixel = 3;
+	int bytes_per_pixel = 3;
 
 	__host__ __device__ image_texture() : data(nullptr), width(0), height(0), bytes_per_scanline(0) {}
 
@@ -111,6 +111,9 @@ class image_texture : public texturez {
 		auto components_per_pixel = bytes_per_pixel;
 
 		data = stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);	//reading the data from disk
+		/*stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);
+		data = new unsigned char[width*height*bytes_per_pixel];
+		data = stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);*/
 
 		if (!data) {	//file not read
 			std::cerr << "ERROR: Could not load texture image file '" << filename << "'.\n";
@@ -119,17 +122,41 @@ class image_texture : public texturez {
 		bytes_per_scanline = bytes_per_pixel * width;
 	}
 
-	__host__ __device__ ~image_texture() {
-		delete data;
+	__host__ int size() {
+		return width*height * sizeof(unsigned char) + 4*sizeof(int) + sizeof(texturez);
 	}
+
+	__host__ __device__ ~image_texture() {
+		delete [] data;
+	}
+
+
+	__host__ __device__ image_texture(unsigned char *d, int *ws, int *hs, int *bpps, int ind) : data(d) {
+		//for intialising the texture with an array of data and an index for that array
+		//d = data pointer
+		//ws = array of widths
+		//hs = array of heights
+		//bpps = array of bytes_per_pixel
+		
+		width = ws[ind];
+		height = hs[ind];
+		bytes_per_pixel = bpps[ind];
+		bytes_per_scanline = bytes_per_pixel * width;
+
+		int start_point = 0;
+		for (int i = 0; i < ind; i++) {
+			start_point += ws[i] * hs[i] * bpps[i];
+		}
+		index = start_point;
+	}	
+
 
 	__device__ virtual color value(const float u, const float v, const vec3& p) const override {
 		if (data == nullptr)	//if not texture data, return cyan color
 			return color(0, 1, 1);
-
 		//Clamp input texture coordinates to [0,1]^2
-		const auto uu = clamp(u, 0.0, 1.0);
-		const auto vv = 1.0 - clamp(v, 0.0, 1.0);	//Flip v to image coordinates
+		const auto uu = clamp_d(u, 0.0, 1.0);
+		const auto vv = 1.0 - clamp_d(v, 0.0, 1.0);	//Flip v to image coordinates
 
 		auto i = static_cast<int>(uu*width);
 		auto j = static_cast<int>(vv*height);
@@ -139,8 +166,36 @@ class image_texture : public texturez {
 		if (j >= height) j = height - 1;
 
 		const auto color_scale = 1.0 / 255.0;	//to scale the input from [0,255] to [0,1]
-		const auto pixel = data + j*bytes_per_scanline + i*bytes_per_pixel;	//the pixel at coordinates (u,v)
+		const auto pixel = data + j*bytes_per_scanline + i*bytes_per_pixel + index;	//the pixel at coordinates (u,v)
 
 		return color(color_scale*pixel[0], color_scale*pixel[1], color_scale*pixel[2]);
 	}
 };
+
+
+void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned char> &imdata, thrust::device_ptr<int> &imwidths, thrust::device_ptr<int> &imhs, thrust::device_ptr<int> &imch) {
+	std::vector<int> ws, hs, nbChannels;	
+	int totalSize = 0;
+	std::vector<unsigned char> imdata_h;
+
+	imread(impaths, ws, hs, nbChannels, imdata_h, totalSize);
+
+	unsigned char* h_ptr = imdata_h.data();	
+	upload_to_device(imdata, h_ptr, imdata_h.size() );
+
+	int *ws_ptr = ws.data();
+	upload_to_device(imwidths, ws_ptr, ws.size() );
+
+	int *hs_ptr = hs.data();
+	upload_to_device(imhs, hs_ptr, hs.size() );
+
+	int *nb_ptr = nbChannels.data();
+	upload_to_device(imch, nb_ptr, nbChannels.size() );
+}
+
+
+/*__global__ void tex_init(image_texture **tex, int num_bytes) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		*tex->data = new unsigned char[num_bytes*3];
+	}
+}*/

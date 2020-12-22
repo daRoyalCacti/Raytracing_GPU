@@ -32,13 +32,14 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
 
 
 
-__device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth) {
+__device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth, vec3 background) {
 	ray cur_ray = r;
-	const vec3 background(0.7f, 0.8f, 1.0f);
+	//const vec3 background(0.7f, 0.8f, 1.0f);
 	color cur_attenuation(1,1,1);
 	color cur_col(1,1,1);
 
 	for (int i = 0; i < depth; i++) {
+		//printf("%i\n", i);
 		hit_record rec;
 
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
@@ -47,7 +48,6 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 		ray scattered;
 		color attenuation;
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-
 		
 		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
 			cur_col = emitted + cur_attenuation*cur_col;
@@ -75,7 +75,7 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 	curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
 }
 
-__global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, curandState *rand_state,  hittable **world, int max_depth, int id) {
+__global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, curandState *rand_state,  hittable **world, int max_depth, int id, color back) {
 	//max_x for size of total image
 	//max_x2 for size of 1 frame buffer
 
@@ -93,7 +93,7 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 		float v = float(j+random_float(&local_rand_state)) / max_y;
 		
 		ray r = (*cam)->get_ray(rand_state, u,v);
-		col += color_f(r, world, &local_rand_state, max_depth);
+		col += color_f(r, world, &local_rand_state, max_depth, back);
 	}
 
 	fb[pixel_index] = col/float(ns);
@@ -111,7 +111,7 @@ int main() {
 	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
-	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
+	const unsigned rpfb = 1000;	//number of rays per pixel to use in a given frame buffer
 	const unsigned no_fb = 10;	//number of frame buffers
 	
 	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
@@ -135,7 +135,7 @@ int main() {
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
 	
 	std::cerr << "\rCreating World                " << std::flush;
-	two_perlin_spheres_scene curr_scene;
+	earth_scene curr_scene;
 
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
@@ -161,7 +161,8 @@ int main() {
 		render<<<blocks, threads>>>(fb, nx, ny, rpfb,	//render is a function defined above
 						curr_scene.d_camera,
 						d_rand_state,
-						curr_scene.d_world, 50, i);		
+						curr_scene.d_world, 50, i,
+						curr_scene.background);		
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tells the CPU that the GPU is done rendering
 		write_frame_buffer("output/" + std::to_string(i) + ".ppm", fb, nx, ny);

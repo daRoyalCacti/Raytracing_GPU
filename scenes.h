@@ -269,3 +269,59 @@ struct two_perlin_spheres_scene : public scene {
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}
 };
+
+
+
+__global__ void create_earth_world(hittable **d_list, hittable **d_world, camera **d_camera, 
+		unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels) {
+		//image_texture *earth_texture) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		//const auto earth_texture2 = new solid_color(1, 1, 1); //make_shared<image_texture>("../textures/earthmap.jpg");
+		const auto earth_texture = new image_texture(imdata, widths, heights, bytes_per_pixels, 0);
+		//const auto earth_texture2 = earth_texture;
+
+		/*for (int i = 0; i < earth_texture->width*earth_texture->height; i++)
+			printf("%i\n", earth_texture->data[i]);*/
+		//printf("\n%i, %i\n",  earth_texture->width, earth_texture->height);
+
+		const auto earth_surface = new lambertian(earth_texture);
+		d_list[0] = new sphere(point3(0,0,0), 2, earth_surface);
+
+		const auto difflight = new diffuse_light(color(4.0, 4.0, 4.0));
+		d_list[1] = new xy_rect(-5, 5, -3, 3, 6, difflight);
+
+
+		//set_camera(vec3(13.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0));
+
+		*d_world    = new hittable_list(d_list, 2);
+		*d_camera   = new camera(vec3(13.0f, 0.0f, 3.0f), vec3(0.0f,0.0f,0.0f), vec3(0,1,0), 20, 16.0f/9.0f, 0.1f, 10.0f, 0, 1 );
+	}
+}
+
+struct earth_scene : public scene {
+	earth_scene() : scene(16.0f/9.0f, background_color::black) {
+		
+		thrust::device_ptr<unsigned char> imdata;
+		thrust::device_ptr<int> imwidths;
+		thrust::device_ptr<int> imhs;
+		thrust::device_ptr<int> imch;
+		
+		std::vector<const char*> image_locs;
+		image_locs.push_back("../textures/earthmap.jpg");
+		
+		make_image(image_locs, imdata, imwidths, imhs, imch);
+
+
+		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));
+
+		create_earth_world<<<1,1>>>(d_list, d_world, d_camera, 
+				thrust::raw_pointer_cast(imdata),
+				thrust::raw_pointer_cast(imwidths),
+				thrust::raw_pointer_cast(imhs),
+				thrust::raw_pointer_cast(imch) );
+				//earth_tex_d);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+
+	}
+};
