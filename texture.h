@@ -111,9 +111,6 @@ struct image_texture : public texturez {
 		auto components_per_pixel = bytes_per_pixel;
 
 		data = stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);	//reading the data from disk
-		/*stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);
-		data = new unsigned char[width*height*bytes_per_pixel];
-		data = stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);*/
 
 		if (!data) {	//file not read
 			std::cerr << "ERROR: Could not load texture image file '" << filename << "'.\n";
@@ -122,9 +119,6 @@ struct image_texture : public texturez {
 		bytes_per_scanline = bytes_per_pixel * width;
 	}
 
-	__host__ int size() {
-		return width*height * sizeof(unsigned char) + 4*sizeof(int) + sizeof(texturez);
-	}
 
 	__host__ __device__ ~image_texture() {
 		delete [] data;
@@ -193,9 +187,3 @@ void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned c
 	upload_to_device(imch, nb_ptr, nbChannels.size() );
 }
 
-
-/*__global__ void tex_init(image_texture **tex, int num_bytes) {
-	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
-		*tex->data = new unsigned char[num_bytes*3];
-	}
-}*/
