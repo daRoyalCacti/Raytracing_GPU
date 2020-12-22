@@ -80,23 +80,13 @@ void write_frame_buffer(std::string file_loc, const color* f, const int width, c
 	std::ofstream out;
 	out.open(file_loc);
 	out << "P3\n" << width << " " << height << "\n255\n";
-	for (int j = height-1; j>=0; j--) 
-		for (int i = width-1; i >= 0; i--) {
+	for (int j = height-1; j >= 0; j--) 
+		for (int i = 0; i < width; i++) {
 			const size_t pixel_index = j*width + i;
-
-			/*auto r = f[pixel_index].x();
-			auto g = f[pixel_index].y();
-			auto b = f[pixel_index].z();*/
 			float r = f[pixel_index].x();
 			float g = f[pixel_index].y();
 			float b = f[pixel_index].z();
 			
-			//averging the results from all the frame buffers
-			/*for (int k = 0; k < no_fb; k++) {
-				r += f[pixel_index + width*k].x();
-				g += f[pixel_index + width*k].y();
-				b += f[pixel_index + width*k].z();
-			}*/
 
 			r /= no_fb;
 			g /= no_fb;

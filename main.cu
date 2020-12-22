@@ -42,14 +42,18 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 		//printf("%i\n", i);
 		hit_record rec;
 
+		//printf("aaa\n");
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
 			return cur_attenuation*background;
+		//printf("bbb\n");
 
 		ray scattered;
 		color attenuation;
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
 		
+		//printf("ccc\n");
 		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
+			//printf("ddd\n");
 			cur_col = emitted + cur_attenuation*cur_col;
 			cur_attenuation *= attenuation;
 			cur_ray = scattered;
@@ -108,22 +112,26 @@ int main() {
 	std::cerr << "Computation started at " << std::ctime(&start_time);
 
 
-	const double aspect_ratio = 16.0 / 9.0;
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
 	const unsigned rpfb = 1000;	//number of rays per pixel to use in a given frame buffer
-	const unsigned no_fb = 10;	//number of frame buffers
+	const unsigned no_fb = 20;	//number of frame buffers
 	
 	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
 	
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
+	
+	std::cerr << "Creating World                " << std::flush;
+	cornell_box_scene curr_scene;
+
+	const double aspect_ratio = curr_scene.aspect;
 
 	const unsigned ny = static_cast<unsigned>(nx / aspect_ratio);
 	const unsigned num_pixels = nx*ny;
 
 
 
-	std::cerr << "Generating a " << nx << "x" << ny << " image with " << ns << " rays per pixel\n";
+	std::cerr << "\rGenerating a " << nx << "x" << ny << " image with " << ns << " rays per pixel" << std::flush;
 	std::cerr << "using " << tx << "x" << ty << " blocks and " << no_fb << " frame buffers.\n";
 
 
@@ -134,11 +142,7 @@ int main() {
 	const size_t fb_size = num_pixels*sizeof(vec3)*no_fb;	
 	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
 	
-	std::cerr << "\rCreating World                " << std::flush;
-	earth_scene curr_scene;
-
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+	
 	
 	
 	//Render to the frame buffer
