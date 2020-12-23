@@ -137,7 +137,7 @@ void average_images(std::string file_dir, std::string output_loc) {
 					std::string width = "";
 					std::string height = "";
 					
-					int size_of_width;	//need to know how many digits in width. e.g. 1200 vs 120
+					int size_of_width = 0;	//need to know how many digits in width. e.g. 1200 vs 120
 					for (const auto& chara : line) {
 						size_of_width++;
 						if (isspace(chara)) {

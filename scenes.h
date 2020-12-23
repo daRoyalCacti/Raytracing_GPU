@@ -6,7 +6,10 @@
 #include "common.h"
 #include "sphere.h"
 #include "material.h"
+#include "moving_sphere.h"
 #include "texture.h"
+#include "bvh.h"
+#include "constant_medium.h"
 
 
 enum class background_color {sky, black};
@@ -15,8 +18,6 @@ __global__ void free_world(hittable ** d_list, hittable **d_world, camera **d_ca
 	for (int i = 0; i < no_hittables; i++) {
 		delete *(d_list+i);
 	}
-	//delete *(d_list);
-	//delete *(d_list+1);
 	delete *d_world;
 	delete *d_camera;
 }

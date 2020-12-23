@@ -2,11 +2,21 @@
 #include "ray.h"
 #include "common.h"
 
+#include <string>
+#include <random>
+
 #include "hittable_list.h"
 
-//for compiling purposes
 #include "color.h"
 #include "camera.h"
+#include "scenes.h"
+
+
+//for creating a directory
+#include <bits/stdc++.h> 
+#include <sys/stat.h> 
+#include <sys/types.h> 
+
 
 struct render_settings {
 	double aspect_ratio;
@@ -38,16 +48,6 @@ struct render_settings {
 	}
 
 };
-
-
-__global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
-	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
-		*(d_list)   = new sphere(vec3(0,0,-1), 0.5, new lambertian(vec3(0, 1, 0)));
-		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, new lambertian(vec3(0, 0, 1)));
-		*d_world    = new hittable_list(d_list,2);
-		*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
-	}
-}
 
 
 
@@ -121,5 +121,70 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	}
 
 	fb[pixel_index] = col/float(ns);
+}
+
+
+
+
+void draw(scene& curr_scene, render_settings settings) {
+	std::cerr << "Allocating Frame Buffer" << std::flush;
+	//Frame buffer (holds the image in the GPU)
+	vec3 *fb;
+	const size_t fb_size = settings.num_pixels*sizeof(vec3);	
+	checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size));	//allocating the frame buffer on the GPU
+	
+	
+	
+	
+	//Render to the frame buffer
+	dim3 blocks(settings.image_width/settings.threads_x+1, settings.image_height/settings.threads_y+1);	//making the frame buffer exceptionally long to combine the multiple frame buffers
+	dim3 threads(settings.threads_x, settings.threads_y);
+	curandState *d_rand_state;
+	checkCudaErrors(cudaMalloc((void**)&d_rand_state, settings.num_pixels*sizeof(curandState) ));
+
+
+
+	std::cerr << "\rIntialising the render        " << std::flush;
+	render_init<<<blocks, threads>>>(settings.image_width, settings.image_height, d_rand_state);		//initialising the render -- currently just setting up the random numbers
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+	
+	std::cerr << "\rCreating temp dir             " << std::flush;
+	//Create a random name for the temp dir
+	std::string rand_str("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+	std::random_device rd;	
+	std::mt19937 generator(rd());
+
+	std::shuffle(rand_str.begin(), rand_str.end(), generator);
+
+	const std::string temp_file_dir = "./" +  rand_str.substr(0, 32);
+
+	mkdir(temp_file_dir.c_str(), 0777);
+	for (int i = 0; i < settings.no_fb; i++) {
+		std::cerr << "\rRendering to frame buffer " << i+1 << "/" << settings.no_fb << "         "  << std::flush;
+		render<<<blocks, threads>>>(fb, settings.image_width, settings.image_height, settings.samples_per_pixel_per_fb,	//render is a function defined above
+						curr_scene.d_camera,
+						d_rand_state,
+						curr_scene.d_world, settings.max_depth, i,
+						curr_scene.background);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tells the CPU that the GPU is done rendering
+		write_frame_buffer(temp_file_dir + "/" + std::to_string(i) + ".ppm", fb, settings.image_width, settings.image_height);
+	}
+
+	checkCudaErrors(cudaFree(fb));
+
+
+	std::cerr << "\rAveraging Frame Buffers         " << std::flush;
+	average_images(temp_file_dir, "image.ppm");
+
+	std::cerr << "\rConverting image to png" << std::endl;
+	system("./to_png.sh");
+
+	std::cerr << "Deleting temp files" << std::endl;
+	remove("image.ppm");
+	std::filesystem::path pathToDelete(temp_file_dir);
+	remove_all(pathToDelete);
+
 }
 
