@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <cctype> 	//for isspace()
 #include <vector>
+#include "common.h"
 
 void write_color(std::ostream &out, const color pixel_color, const int samples_per_pixel) {
 	auto r = pixel_color.x();

@@ -152,12 +152,10 @@ __host__ __device__ inline vec3 reflect(const vec3& v, const vec3& n) {
 	return v - 2 * dot(v,n)*n;
 }
 
-__host__ __device__ inline vec3 refract(const vec3& uv, const vec3& n, const float etai_over_etat) {
+/*__host__*/ __device__ inline vec3 refract(const vec3& uv, const vec3& n, const float etai_over_etat) {
 	//Computes the refracted ray of light passing through a dielectric material using snell's law
-	const auto cos_theta = min(dot(-uv, n), 1.0);	
+	const auto cos_theta = fminf(dot(-uv, n), 1.0);
 	const vec3 r_out_perp = etai_over_etat * (uv + cos_theta*n);
-	const vec3 r_out_parallel = -sqrt(abs(1.0 - r_out_perp.length_squared() )) * n;
+	const vec3 r_out_parallel = -sqrtf(fabsf(1.0 - r_out_perp.length_squared() )) * n;
 	return r_out_perp + r_out_parallel;
 }
-
-

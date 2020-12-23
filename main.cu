@@ -114,15 +114,15 @@ int main() {
 
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
-	const unsigned rpfb = 1000;	//number of rays per pixel to use in a given frame buffer
-	const unsigned no_fb = 20;	//number of frame buffers
+	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
+	const unsigned no_fb = 10;	//number of frame buffers
 	
 	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
 	
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
 	
 	std::cerr << "Creating World                " << std::flush;
-	cornell_box_scene curr_scene;
+	cornell_smoke_box_scene curr_scene;
 
 	const double aspect_ratio = curr_scene.aspect;
 
@@ -132,7 +132,7 @@ int main() {
 
 
 	std::cerr << "\rGenerating a " << nx << "x" << ny << " image with " << ns << " rays per pixel" << std::flush;
-	std::cerr << "using " << tx << "x" << ty << " blocks and " << no_fb << " frame buffers.\n";
+	std::cerr << " using " << tx << "x" << ty << " blocks and " << no_fb << " frame buffers.\n";
 
 
 

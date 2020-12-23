@@ -332,32 +332,18 @@ __global__ void create_cornell_box_world(hittable **d_list, hittable **d_world, 
 		d_list[4] = new xz_rect(0, 555, 0, 555, 555, white);	//roof
 
 		d_list[5] = new xy_rect(0, 555, 0, 555, 555, white);	//back wall
-		//world.add(make_shared<xy_rect>(0, 555, 0, 555, 0  , white));	//front wall
-		
-		//big box
-		//box *box1 = new box(point3(0,0,0), point3(165,330,165), white);
-		//auto test1/*d_list[6]*/ = new rotate_y(box1, 15);
-		//d_list[6] = new translate(test1, vec3(265, 0, 295));
-		//d_list[6] = box1;
+	
 
+		//big box
 		d_list[6] = new box(point3(0, 0, 0), point3(165, 330, 165), white);
 		d_list[6] = new rotate_y(d_list[6], 15);
 		d_list[6] = new translate(d_list[6], vec3(265, 0, 295));
 
+		//small box
 		d_list[7] = new box(point3(0, 0, 0), point3(165, 165, 165), white);
 		d_list[7] = new rotate_y(d_list[7], -18);
 		d_list[7] = new translate(d_list[7], vec3(130, 0, 65) );
 				
-
-		//small box
-		//box *box2 = new box(point3(0,0,0), point3(165,165,165), white);
-		//auto test2/*d_list[7]*/ = new rotate_y(box2, -18);
-		//d_list[7]  = new translate(test2, vec3(130,0,65));
-		//d_list[7] = box2;
-
-
-		//set_camera(vec3(278, 278, -800), vec3(278, 278, 0), 40.0, 0.0); 
-
 		*d_world    = new hittable_list(d_list, 8);
 		*d_camera   = new camera(vec3(278, 278, -800), vec3(278, 278, 0), vec3(0,1,0), 40, 1.0f, 0.0f, 10.0f, 0, 1 );
 }
@@ -365,6 +351,52 @@ __global__ void create_cornell_box_world(hittable **d_list, hittable **d_world, 
 struct cornell_box_scene : public scene {
 	cornell_box_scene() : scene(1.0f, 18, background_color::black) {
 		create_cornell_box_world<<<1,1>>>(d_list, d_world, d_camera);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+	}
+};
+
+
+
+
+__global__ void create_cornell_smoke_box_world(hittable **d_list, hittable **d_world, camera **d_camera) {
+		const auto red = new lambertian(color(0.65, 0.05, 0.05));
+		const auto white = new lambertian(color(0.73, 0.73, 0.73));
+		const auto green = new lambertian(color(0.12, 0.45, 0.15));
+		const auto light = new diffuse_light(color(15, 15, 15));	//very bright light
+
+		d_list[0] = new yz_rect(0, 555, 0, 555, 555, green);	//left wall
+		d_list[1] = new yz_rect(0, 555, 0, 555, 0  , red  );	//right wall
+
+		d_list[2] = new xz_rect(113, 443, 127, 432, 554, light);	//light on roof
+
+		d_list[3] = new xz_rect(0, 555, 0, 555, 0  , white);	//floor
+		d_list[4] = new xz_rect(0, 555, 0, 555, 555, white);	//roof
+
+		d_list[5] = new xy_rect(0, 555, 0, 555, 555, white);	//back wall
+
+
+		//big box
+		d_list[6] = new box(point3(0, 0, 0), point3(165, 330, 165), white);
+		d_list[6] = new rotate_y(d_list[6], 15);
+		d_list[6] = new translate(d_list[6], vec3(265, 0, 295));
+		d_list[6] = new constant_medium(d_list[6], 0.01, color(0,0,0) );
+		//world.add(make_shared<constant_medium>(box1, 0.01, color(0,0,0)) );
+
+		//small box
+		d_list[7] = new box(point3(0, 0, 0), point3(165, 165, 165), white);
+		d_list[7] = new rotate_y(d_list[7], -18);
+		d_list[7] = new translate(d_list[7], vec3(130, 0, 65) );	
+		d_list[7] = new constant_medium(d_list[7], 0.01, color(1,1,1) );
+		//world.add(make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
+
+		*d_world    = new hittable_list(d_list, 8);
+		*d_camera   = new camera(vec3(278, 278, -800), vec3(278, 278, 0), vec3(0,1,0), 40, 1.0f, 0.0f, 10.0f, 0, 1 );
+}
+
+struct cornell_smoke_box_scene : public scene {
+	cornell_smoke_box_scene() : scene(1.0f, 18, background_color::black) {
+		create_cornell_smoke_box_world<<<1,1>>>(d_list, d_world, d_camera);		
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}
