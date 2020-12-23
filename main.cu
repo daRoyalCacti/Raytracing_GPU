@@ -19,6 +19,8 @@
 
 #include "scenes.h"
 
+#include <filesystem>
+
 
 __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
@@ -114,7 +116,7 @@ int main() {
 
 	const unsigned tx = 8;	//dividing the work on the GPU into
 	const unsigned ty = 8; 	//threads of tx*ty threads
-	const unsigned rpfb = 100;	//number of rays per pixel to use in a given frame buffer
+	const unsigned rpfb = 10;	//number of rays per pixel to use in a given frame buffer
 	const unsigned no_fb = 10;	//number of frame buffers
 	
 	const unsigned nx = 1200;	//image width in frame buffer (also the output image size)
@@ -122,7 +124,7 @@ int main() {
 	const unsigned ns = rpfb*no_fb;	//rays per pixel
 	
 	std::cerr << "Creating World                " << std::flush;
-	cornell_smoke_box_scene curr_scene;
+	first_scene curr_scene;
 
 	const double aspect_ratio = curr_scene.aspect;
 
@@ -176,7 +178,13 @@ int main() {
 	std::cerr << "\rAveraging Frame Buffers         " << std::flush;
 	average_images("./output", "image.ppm");
 
+	std::cerr << "\rConverting image to png" << std::endl;
+	system("./to_png.sh");
 
+	std::cerr << "Deleting temp files" << std::endl;
+	remove("image.ppm");
+	std::filesystem::path pathToDelete("./output");
+	remove_all(pathToDelete);
 
 	std::cerr << "\rCleaning Up                   " << std::flush;	
 	//clean up
