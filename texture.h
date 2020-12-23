@@ -6,9 +6,6 @@
 
 
 struct texturez {
-	//int n;
-	//__device__ texturez() {}
-	//__device__ texturez(int n_) : n(n_) {}
 	__device__ virtual color value(const float u, const float v, const point3& p) const {return color(0,0,0);}
 };
 

@@ -11,9 +11,6 @@ struct box : public hittable {
 	hittable_list *sides;
 	hittable ** temp_hittable;	//for constructing the box
 
-	//__device__ box() {sides.alloc(6);}
-	//__host__ box(const point3& p0, const point3& p1, material *ptr);
-	
 	__device__ box(point3 p0, point3 p1, material *ptr) : box_min(p0), box_max(p1) {
 		temp_hittable = new hittable*[6];
 		
@@ -42,18 +39,3 @@ struct box : public hittable {
 	}
 };
 
-//__host__ box::box(const point3& p0, const point3& p1, material *ptr) : box_min(p0), box_max(p1) {
-//	sides.alloc(6);
-//}
-
-
-/*(__device__ void box::create(const point3& p0, const point3& p1, material *ptr) {
-	sides.add(new xy_rect(p0.x(), p1.x(), p0.y(), p1.y(), p1.z(), ptr));
-	sides.add(new xy_rect(p0.x(), p1.x(), p0.y(), p1.y(), p0.z(), ptr));
-
-	sides.add(new xz_rect(p0.x(), p1.x(), p0.z(), p1.z(), p1.y(), ptr));
-	sides.add(new xz_rect(p0.x(), p1.x(), p0.z(), p1.z(), p0.y(), ptr));
-	
-	sides.add(new yz_rect(p0.y(), p1.y(), p0.z(), p1.z(), p1.x(), ptr));
-	sides.add(new yz_rect(p0.y(), p1.y(), p0.z(), p1.z(), p0.x(), ptr));
-}*/

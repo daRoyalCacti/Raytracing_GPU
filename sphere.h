@@ -7,12 +7,10 @@
 struct sphere : public hittable {
 	point3 center;
 	float radius;
-	//shared_ptr<material> mat_ptr;
 	material* mat_ptr;
 
 	__device__ sphere() {}
 	__device__ sphere(const point3 cen, const float r, material* m): center(cen), radius(r), mat_ptr(m) {}
-	//__device__ sphere(const point3 cen, const float r) : center(cen), radius(r) {}
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
@@ -76,7 +74,5 @@ __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, 
 
 __device__ bool sphere::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	output_box = aabb(center - vec3(radius, radius, radius), center + vec3(radius, radius, radius));
-	//printf("\n%f, %f\n", output_box.min().x(), output_box.max().x() );
-	//printf("\n%f\n", center);
 	return true;
 }

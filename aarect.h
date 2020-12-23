@@ -61,7 +61,6 @@ struct yz_rect : public hittable {
 
 
 __device__ bool xy_rect::hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const {
-	//printf("xy_rect start\n");
 	const auto t = (k-r.origin().z()) / r.direction().z();	//time of collision - see aabb.h for why this is the case
 
 	if (t < t_min || t > t_max)	//if collision is outside of specified times
@@ -86,7 +85,6 @@ __device__ bool xy_rect::hit(const ray&r, const float t_min, const float t_max, 
 	rec.set_face_normal(r, outward_normal);
 	rec.mat_ptr = mp;
 	rec.p = r.at(t);
-	//printf("xy_rect end\n");
 
 	return true;
 }

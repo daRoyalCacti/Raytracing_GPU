@@ -382,14 +382,12 @@ __global__ void create_cornell_smoke_box_world(hittable **d_list, hittable **d_w
 		d_list[6] = new rotate_y(d_list[6], 15);
 		d_list[6] = new translate(d_list[6], vec3(265, 0, 295));
 		d_list[6] = new constant_medium(d_list[6], 0.01, color(0,0,0) );
-		//world.add(make_shared<constant_medium>(box1, 0.01, color(0,0,0)) );
 
 		//small box
 		d_list[7] = new box(point3(0, 0, 0), point3(165, 165, 165), white);
 		d_list[7] = new rotate_y(d_list[7], -18);
 		d_list[7] = new translate(d_list[7], vec3(130, 0, 65) );	
 		d_list[7] = new constant_medium(d_list[7], 0.01, color(1,1,1) );
-		//world.add(make_shared<constant_medium>(box2, 0.01, color(1,1,1)));
 
 		*d_world    = new hittable_list(d_list, 8);
 		*d_camera   = new camera(vec3(278, 278, -800), vec3(278, 278, 0), vec3(0,1,0), 40, 1.0f, 0.0f, 10.0f, 0, 1 );

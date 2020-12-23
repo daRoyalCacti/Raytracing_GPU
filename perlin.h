@@ -18,7 +18,6 @@ class perlin {
 
 		for (int i = 0; i < point_count; i++)
 			p[i] = i;
-		//std::iota(&p[0], &p[point_count], 0);
 
 		permute(s, p, point_count);
 
@@ -31,7 +30,6 @@ class perlin {
 			const int temp = p[i];
 			p[i] = p[target];
 			p[target] = temp;
-			//std::swap(p[i], p[target]);
 		}
 	}
 

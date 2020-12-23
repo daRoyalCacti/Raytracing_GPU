@@ -2,9 +2,6 @@
 
 #include <iostream>
 #include <curand_kernel.h>
-//#include <cmath>
-
-//using std::sqrt;
 
 //are sort of out of place here
 __device__ inline float random_float(curandState *local_rand_state) {
@@ -152,7 +149,7 @@ __host__ __device__ inline vec3 reflect(const vec3& v, const vec3& n) {
 	return v - 2 * dot(v,n)*n;
 }
 
-/*__host__*/ __device__ inline vec3 refract(const vec3& uv, const vec3& n, const float etai_over_etat) {
+__device__ inline vec3 refract(const vec3& uv, const vec3& n, const float etai_over_etat) {
 	//Computes the refracted ray of light passing through a dielectric material using snell's law
 	const auto cos_theta = fminf(dot(-uv, n), 1.0);
 	const vec3 r_out_perp = etai_over_etat * (uv + cos_theta*n);

@@ -2,7 +2,7 @@
 #pragma once
 
 // Disable warnings
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__NVCC__)
 	//Visual C++
 	#pragma warning (push, 0)
 #endif
@@ -11,6 +11,6 @@
 #include "external/stb_image.h"
 
 //Restoring warnings
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__NVCC__)
 	#pragma warning (pop)
 #endif

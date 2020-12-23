@@ -7,35 +7,14 @@
 struct hittable_list : public hittable {
 	hittable** objects;
 	int list_size;
-	//int count = 0;
 
 	__device__ hittable_list() {}
 	__device__ hittable_list(hittable **l, int n) :objects(l), list_size(n)  {}
-	
-	/*__host__ ~hittable_list() {
-		checkCudaErrors(cudaFree(objects));
-	}*/
+
 
 	__device__ ~hittable_list() {
 		delete objects;
 	}
-
-	/*__host__ void alloc(int n) {
-		checkCudaErrors(cudaMalloc( (void**)&objects, n*sizeof(hittable*) ));
-	}*/
-
-	/*__device__ void alloc(int n) {
-		*objects = new hittable[n]();
-	}
-
-	__device__ void add(hittable* object) {
-		objects[count++] = object;
-	}*/
-
-
-	//objects cannot be a vector on the GPU
-	//__deivce__ void clear() {objects.clear();}
-	//__device__ void add(shared_ptr<hittable> object) {objects.push_back(object);}
 
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
@@ -48,7 +27,6 @@ __device__ bool hittable_list::hit(const ray& r, const float t_min, const float 
 	
 	//testing to see if ray hits anyobject between the given times
 	for (int i = 0; i < list_size; i++) {	//iterating through all objects that could be hit
-		//printf("%i/%i\n", i, list_size-1);
 		if (objects[i]->hit(r, t_min, closest_so_far, temp_rec, s)) {//checking to see if the ray hit the object
 			//printf("%i/%i\n", i, list_size-1);
 			hit_anything = true;

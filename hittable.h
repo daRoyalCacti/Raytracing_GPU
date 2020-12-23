@@ -35,20 +35,15 @@ struct translate : public hittable {
 	__device__ translate(hittable *p, const vec3& displacement) : ptr(p), offset(displacement) {}
 
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override {
-		//printf("translate begin\n");
 		const ray moved_r(r.origin() - offset, r.direction(), r.time());	//moving object by offset is same as translting axes by -offset
 		
-		//printf("1\n");
 		if(!ptr->hit(moved_r, t_min, t_max, rec, s ))	{//if ray doesn't hits object in new axes
-			//printf("1.5\n");
 			return false;
 		}
 
-		//printf("2\n");
 		rec.p += offset;
 		rec.set_face_normal(moved_r, rec.normal);
 
-		//printf("translate end\n");
 
 		return true;
 	}
@@ -81,7 +76,6 @@ struct rotate_y : public hittable {
 };
 
 __device__ rotate_y::rotate_y(hittable *p, const float angle) : ptr(p) {
-	//printf("rotatey begin\n");
 	const auto radians = degrees_to_radians(angle);
 	sin_theta = sin(radians);
 	cos_theta = cos(radians);
@@ -113,7 +107,6 @@ __device__ rotate_y::rotate_y(hittable *p, const float angle) : ptr(p) {
 			}
 
 	bbox = aabb(min,max);
-	//printf("rotatey end\n");
 }
 
 __device__ bool rotate_y::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {

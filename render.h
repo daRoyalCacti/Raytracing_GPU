@@ -54,26 +54,20 @@ struct render_settings {
 
 __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state, int depth, vec3 background) {
 	ray cur_ray = r;
-	//const vec3 background(0.7f, 0.8f, 1.0f);
 	color cur_attenuation(1,1,1);
 	color cur_col(1,1,1);
 
 	for (int i = 0; i < depth; i++) {
-		//printf("%i\n", i);
 		hit_record rec;
 
-		//printf("aaa\n");
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
 			return cur_attenuation*background;
-		//printf("bbb\n");
 
 		ray scattered;
 		color attenuation;
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
 		
-		//printf("ccc\n");
 		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
-			//printf("ddd\n");
 			cur_col = emitted + cur_attenuation*cur_col;
 			cur_attenuation *= attenuation;
 			cur_ray = scattered;
@@ -84,8 +78,6 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 
 	}
 	return color(0,0,0);	//exceeded recursion
-
-	//return emitted + attenuation*color_f(scattered, world, local_rand_state, depth-1);
 }
 
 
@@ -100,8 +92,6 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
 }
 
 __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, curandState *rand_state,  hittable **world, int max_depth, int id, color back) {
-	//max_x for size of total image
-	//max_x2 for size of 1 frame buffer
 
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
 	int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -112,7 +102,6 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	vec3 col(0,0,0);
 	
 	for(int s=0; s < ns; s++) {
-		//printf("%i\n", s);
 		float u = float(i +random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
 		

@@ -38,7 +38,6 @@ __device__ hittable_id* merge(hittable_id* A, int L1, int R1, int L2, int R2, in
 	while (L1 <= R1 && L2 <= R2) {
 		A[L1].obj->bounding_box(0, 0, box1);
 		A[L2].obj->bounding_box(0, 0, box2);
-		//if (A[L1] <= A[L2]) {
 		if (box1.min().e[axis] <= box2.min().e[axis]) {
 			temp[index] = A[L1];
 			index++;
@@ -86,10 +85,8 @@ __device__ void merge_sort(hittable** A, int n, int* O, int axis) {
 	int i, L1, R1, L2, R2;
 	
 	while (len < n) {
-		//std::cout << "len = " << len << std::endl;
 		i = 0;
 		while (i < n) {
-			//std::cout << "i = " << i << std::endl;
 			L1 = i;
 			R1 = i + len-1;
 			L2 = i + len;
@@ -104,7 +101,6 @@ __device__ void merge_sort(hittable** A, int n, int* O, int axis) {
 			auto temp = merge(Out, L1, R1, L2, R2, axis);
 			
 			for (int j=0; j < R2-L1+1; j++) { 
-				//std::cout << "i+j " << i+j << std::endl;
 				Out[i+j] = temp[j];
 			}
 
@@ -142,7 +138,6 @@ struct bvh_node : public hittable {
 	aabb* bounds;	//the bounding boxes for each node of the tree
 	int* obj_s[3];	//the sorted indices of the objects based on an axis
 
-	//__device__ bvh_node();
 	__device__ bvh_node(int num_obj);
 
 	__device__ int num_nodes() const {
@@ -276,7 +271,7 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 	objs = new hittable*[num_obj];
 
 
-	objs = hits;	//not sure if will work
+	objs = hits;	
 	//first filling the sorted arrays
 	
 	obj_s[0] = new int[n];
@@ -292,7 +287,6 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 	for (int i = 0; i < n; i++)
 		info[0].ids[i] = i;
 
-	//printf("\n%i %i\n", info[0].left, info[0].right);
 	for (int node = 1; node < num_nodes(); node++)
 		info[node].ids = new int[info[node].num];
 	
@@ -309,10 +303,8 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 		int counterl = 0;
 		int counterr = 0;
 		int counter = 0;
-		//bool should_break;
 		for (int i = 0; i < n; i++) {
-			//should_break = false;
-			for (int j = 0; j < info[node].num /*&& !should_break*/; j++) {
+			for (int j = 0; j < info[node].num; j++) {
 				if (obj_s[axis][i] == info[node].ids[j]) {
 					if (counter < info[info[node].left].num) {
 						info[info[node].left].ids[counterl++] = info[node].ids[j];
