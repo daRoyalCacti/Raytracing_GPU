@@ -10,6 +10,7 @@
 #include "texture.h"
 #include "bvh.h"
 #include "constant_medium.h"
+#include "triangle.h"
 
 
 enum class background_color {sky, black};
@@ -396,6 +397,30 @@ __global__ void create_cornell_smoke_box_world(hittable **d_list, hittable **d_w
 struct cornell_smoke_box_scene : public scene {
 	cornell_smoke_box_scene() : scene(1.0f, 18, background_color::black) {
 		create_cornell_smoke_box_world<<<1,1>>>(d_list, d_world, d_camera);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+	}
+};
+
+
+
+
+__global__ void create_triangle_world(hittable **d_list, hittable **d_world, camera **d_camera) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		*(d_list)   = new triangle(vec3(-0.5f, 0, 0), vec3(0, 1, 10), vec3(0.f, 0, 0), 0, 0, 0, 1, 1, 0, new lambertian(vec3(0, 1, 0)) );
+			//sphere(vec3(0,0,-1), 0.5, new lambertian(vec3(0, 1, 0)));
+		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, new lambertian(vec3(0, 0, 1)));
+
+		*d_world    = new hittable_list(d_list,2);
+		*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
+	}
+	
+}
+
+
+struct triangle_scene : public scene {
+	triangle_scene() : scene(16.0f/9.0f, 2, background_color::sky) {
+		create_triangle_world<<<1,1>>>(d_list, d_world, d_camera);		
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}
