@@ -152,7 +152,7 @@ struct image_texture : public texturez {
 		auto i = static_cast<int>(uu*width);
 		auto j = static_cast<int>(vv*height);
 
-		//Clamp integer mapping sicne actual coordinates should be less than 1.0
+		//Clamp integer mapping since actual coordinates should be less than 1.0
 		if (i >= width)  i = width - 1;
 		if (j >= height) j = height - 1;
 

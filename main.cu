@@ -13,7 +13,7 @@ int main() {
 
 	
 	std::cerr << "Creating World                " << std::flush;
-	triangles_scene curr_scene;
+	triangle_scene curr_scene;
 
 
 	render_settings settings;

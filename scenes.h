@@ -428,7 +428,7 @@ struct triangle_scene : public scene {
 };
 
 
-
+/*
 __global__ void create_triangles_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable** temp_list, curandState* s) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		//hittable** temp_list;
@@ -472,4 +472,4 @@ struct triangles_scene : public scene {
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}
-};
+};*/
