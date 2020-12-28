@@ -11,6 +11,7 @@
 #include "bvh.h"
 #include "constant_medium.h"
 #include "triangle.h"
+#include "triangle_mesh.h"
 
 
 enum class background_color {sky, black};
@@ -421,6 +422,53 @@ __global__ void create_triangle_world(hittable **d_list, hittable **d_world, cam
 struct triangle_scene : public scene {
 	triangle_scene() : scene(16.0f/9.0f, 2, background_color::sky) {
 		create_triangle_world<<<1,1>>>(d_list, d_world, d_camera);		
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+	}
+};
+
+
+
+__global__ void create_triangles_world(hittable **d_list, hittable **d_world, camera **d_camera, hittable** temp_list, curandState* s) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		//hittable** temp_list;
+		//temp_list = new hittable*[4];
+
+		temp_list[0]   = new triangle(vec3(-0.5f, 0, 0), vec3(0, 1, 10), vec3(0.5f, 0, 0), 0, 0, 0, 1, 1, 0, new lambertian(vec3(0, 1, 0)) );
+		temp_list[1] = new triangle(vec3(0.5f, 0, 0), vec3(0, 1, 10), vec3(0.5f, 1, 0), 0, 0, 0, 1, 1, 0, new lambertian(vec3(1, 1, 0)) );
+		temp_list[2] = new triangle(vec3(1.5f, 0, 0), vec3(0, 2, 10), vec3(1.5f, 1, 0), 0, 0, 0, 1, 1, 0, new lambertian(vec3(1, 1, 1)) );
+		temp_list[3] = new triangle(vec3(1.5f, 0, 0), vec3(1.5f, 1, 10), vec3(1.5f, 0, 2), 0, 0, 0, 1, 1, 0, new lambertian(vec3(1, 1, 1)) );
+
+
+		//*(d_list) = new triangle_mesh(temp_list, 4, 0, 1, s);
+		*(d_list) = new bvh_node(temp_list, 4, 0, 1, s);
+		*(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, new lambertian(vec3(0, 0, 1)));
+
+		*d_world    = new hittable_list(d_list, 2);
+		*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
+	}
+	
+}
+
+
+struct triangles_scene : public scene {
+	triangles_scene() : scene(16.0f/9.0f,  background_color::sky) {
+		no_hittables = 2;
+
+		curandState* rand_state;
+		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
+
+		world_init<<<1,1>>>(rand_state);	//intialising rand_state
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+
+
+		hittable** temp_list;
+		checkCudaErrors(cudaMalloc( (void**)&temp_list, 4*sizeof(hittable*) ));
+
+		checkCudaErrors(cudaMalloc((void**)&d_list, sizeof(hittable*) + size_of_bvh(4)) );	
+
+		create_triangles_world<<<1,1>>>(d_list, d_world, d_camera, temp_list, rand_state);		
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}

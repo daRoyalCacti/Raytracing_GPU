@@ -67,22 +67,7 @@ __device__ inline float clamp_d(const float x, const float min, const float max)
 }
 
 
-void imread(std::vector<const char*> impaths, std::vector<int> &ws, std::vector<int> &hs, std::vector<int> &nbChannels, std::vector<unsigned char> &imdata, int &size) {
-	const int num = impaths.size();
-	ws.resize(num);
-	hs.resize(num);
-	nbChannels.resize(num);
 
-	for (int i = 0; i < num; i++) {
-		unsigned char *data = stbi_load(impaths[i], &ws[i], &hs[i], &nbChannels[i], 0);
-		size += ws[i] * hs[i] * nbChannels[i];
-
-		for(int k = 0; k < ws[i] * hs[i] *  nbChannels[i]; k++) {
-			imdata.push_back(data[k]);
-		}
-	}
-
-}
 
 
 template <typename T>

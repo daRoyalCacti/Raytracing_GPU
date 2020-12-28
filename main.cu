@@ -13,7 +13,7 @@ int main() {
 
 	
 	std::cerr << "Creating World                " << std::flush;
-	triangle_scene curr_scene;
+	triangles_scene curr_scene;
 
 
 	render_settings settings;
@@ -32,8 +32,7 @@ int main() {
 
 
 	draw(curr_scene, settings);
-
-
+	
 	//end timing
 	const auto end = std::chrono::system_clock::now();
 	const std::time_t end_time = std::chrono::system_clock::to_time_t(end);

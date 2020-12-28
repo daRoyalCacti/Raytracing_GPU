@@ -33,6 +33,21 @@ struct triangle : public hittable {
 		if (vertex2.z() < min_z)
 			min_z = vertex2.z();
 
+
+		if (vertex1.x() > max_x)
+			max_x = vertex1.x();
+		if (vertex1.y() > max_y)
+			max_y = vertex1.y();
+		if (vertex1.z() > max_z)
+			max_z = vertex1.z();
+
+		if (vertex2.x() > max_x)
+			max_x = vertex2.x();
+		if (vertex2.y() > max_y)
+			max_y = vertex2.y();
+		if (vertex2.z() > max_z)
+			max_z = vertex2.z();
+
 		//creating the bounding box
 		output_box = aabb(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z) );
 		return true;

@@ -96,15 +96,15 @@ struct marble_texture : public texturez {
 
 struct image_texture : public texturez {
 	unsigned char* data;	//the data read from file
-	int width, height;	//the width and height of the image
-	int bytes_per_scanline;
+	int width = 0, height = 0;	//the width and height of the image
+	int bytes_per_scanline = 0;
 	int index = 0;	//index where the texture starts
 
 	int bytes_per_pixel = 3;
 
-	__host__ __device__ image_texture() : data(nullptr), width(0), height(0), bytes_per_scanline(0) {}
+	//__host__ __device__ image_texture() : data(nullptr), width(0), height(0), bytes_per_scanline(0) {}
 
-	__host__ image_texture(const char* filename) {
+	/*__host__ image_texture(const char* filename) {
 		auto components_per_pixel = bytes_per_pixel;
 
 		data = stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);	//reading the data from disk
@@ -114,7 +114,7 @@ struct image_texture : public texturez {
 			width = height =0;
 		}
 		bytes_per_scanline = bytes_per_pixel * width;
-	}
+	}*/
 
 
 	__host__ __device__ ~image_texture() {
@@ -163,16 +163,33 @@ struct image_texture : public texturez {
 	}
 };
 
+void imread(std::vector<const char*> impaths, std::vector<int> &ws, std::vector<int> &hs, std::vector<int> &nbChannels, std::vector<unsigned char> &imdata, int &size) {
+	const int num = impaths.size();
+	ws.resize(num);
+	hs.resize(num);
+	nbChannels.resize(num);
+
+	for (int i = 0; i < num; i++) {
+		unsigned char *data = stbi_load(impaths[i], &ws[i], &hs[i], &nbChannels[i], 0);
+		size += ws[i] * hs[i] * nbChannels[i];
+
+		for(int k = 0; k < ws[i] * hs[i] *  nbChannels[i]; k++) {
+			imdata.push_back(data[k]);
+		}
+	}
+
+}
+
 
 void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned char> &imdata, thrust::device_ptr<int> &imwidths, thrust::device_ptr<int> &imhs, thrust::device_ptr<int> &imch) {
 	std::vector<int> ws, hs, nbChannels;	
 	int totalSize = 0;
 	std::vector<unsigned char> imdata_h;
 
-	imread(impaths, ws, hs, nbChannels, imdata_h, totalSize);
+	imread(impaths, ws, hs, nbChannels, imdata_h, totalSize);	//imread defined above
 
 	unsigned char* h_ptr = imdata_h.data();	
-	upload_to_device(imdata, h_ptr, imdata_h.size() );
+	upload_to_device(imdata, h_ptr, imdata_h.size() );	//upload_to_device defined in common.h
 
 	int *ws_ptr = ws.data();
 	upload_to_device(imwidths, ws_ptr, ws.size() );

@@ -6,7 +6,7 @@ NVCC           = $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER)
 #NVCC_DBG       = -g -G
 NVCC_DBG       =
 
-NVCCFLAGS      = $(NVCC_DBG) -m64 -std=c++17
+NVCCFLAGS      = $(NVCC_DBG) -m64 -std=c++17 -lassimp
 GENCODE_FLAGS  = -gencode arch=compute_60,code=sm_60
 
 #Generate: Generate.o

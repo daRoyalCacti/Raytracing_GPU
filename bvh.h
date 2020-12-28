@@ -132,6 +132,7 @@ int size_of_bvh(int n) {
 
 struct bvh_node : public hittable {
 	hittable** objs;	//the actual objects
+	__device__ bvh_node(){}
 	__device__ bvh_node(hittable** hits, int num_obj, const float time0, const float time1, curandState *s);
 	node_info* info;
 	int n;	//number of objects associated to the tree

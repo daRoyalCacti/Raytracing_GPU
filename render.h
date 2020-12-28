@@ -60,13 +60,16 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 	for (int i = 0; i < depth; i++) {
 		hit_record rec;
 
+		//printf("1\n");
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
 			return cur_attenuation*background;
 
 		ray scattered;
 		color attenuation;
+		//printf("2\n");
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
 		
+		//printf("3\n");
 		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
 			cur_col = emitted + cur_attenuation*cur_col;
 			cur_attenuation *= attenuation;
@@ -74,6 +77,7 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 		} else {
 			return cur_attenuation*emitted;
 		}
+		//printf("4\n");
 
 
 	}
