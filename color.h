@@ -49,6 +49,7 @@ void write_frame_buffer(std::string file_loc, const color* f, const int width, c
 
 
 namespace fs = std::filesystem;
+//could be updated using std::string.find(std::string)
 void average_images(std::string file_dir, std::string output_loc) {
 	int num_files = 0;
 	bool first_file = true;

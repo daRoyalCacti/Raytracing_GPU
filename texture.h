@@ -171,6 +171,10 @@ void imread(std::vector<const char*> impaths, std::vector<int> &ws, std::vector<
 
 	for (int i = 0; i < num; i++) {
 		unsigned char *data = stbi_load(impaths[i], &ws[i], &hs[i], &nbChannels[i], 0);
+		if (!data) {
+			std::cerr << "Failed to load texture " << impaths[i] << std::endl;
+			return;
+		}
 		size += ws[i] * hs[i] * nbChannels[i];
 
 		for(int k = 0; k < ws[i] * hs[i] *  nbChannels[i]; k++) {
@@ -199,5 +203,9 @@ void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned c
 
 	int *nb_ptr = nbChannels.data();
 	upload_to_device(imch, nb_ptr, nbChannels.size() );
+
+	/*for (int i = 0; i < imdata_h.size(); i++) {
+		stbi_image_free(imdata_h[i]);	//can free the cpu data since it has been uploaded to the gpu
+	}*/
 }
 

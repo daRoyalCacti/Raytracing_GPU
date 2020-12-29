@@ -46,7 +46,7 @@ struct triangle_mesh : public hittable {
 
 
 
-void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> vertices, std::vector<unsigned> indices, std::vector<float> uvs, std::vector<std::string> tex_paths) {
+void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
 	
 	for (unsigned i = 0; i < mesh->mNumVertices; i++) {
 		//process vertex positions and texture coordinates
@@ -84,19 +84,30 @@ void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> vertices
 		//saying that want all diffuse textures
 		const aiTextureType type = aiTextureType_DIFFUSE;
 	
-		//actually loading the textures
+				//actually loading the textures
 		for (unsigned i = 0; i < mat->GetTextureCount(type); i++) {
 			aiString str;
 			mat->GetTexture(type, i , &str);
 			std::string path = str.C_Str();
-			tex_paths.push_back(path);	
+
+			bool already_loaded = false;
+			for (int i = 0; i < tex_paths.size(); i++) {
+				if (path == tex_paths[i]) {
+					already_loaded = true;
+					break;
+				}
+			}
+			if (!already_loaded) {
+				tex_paths.push_back(path);	
+			}
+
 		}
 	}
 
 }
 
 
-void processNode(aiNode *node, const aiScene *scene, std::vector<float> vertices, std::vector<unsigned> indices, std::vector<float> uvs, std::vector<std::string> tex_paths) {
+void processNode(aiNode *node, const aiScene *scene, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
 	//process all the node's meshes
 	for (unsigned i = 0; i < node->mNumMeshes; i++) {
 		aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
@@ -110,7 +121,7 @@ void processNode(aiNode *node, const aiScene *scene, std::vector<float> vertices
 }
 
 
-void load_model(const std::string file_name, std::vector<float> vertices, std::vector<unsigned> indices, std::vector<float> uvs, std::vector<std::string> tex_paths) {
+void load_model(const std::string file_name, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
 	//https://learnopengl.com/Model-Loading/Model	
 	Assimp::Importer importer;
 	const aiScene *scene = importer.ReadFile(file_name, aiProcess_Triangulate | aiProcess_GenNormals /*| aiProcess_FlipUVS*/);	
@@ -128,7 +139,7 @@ void load_model(const std::string file_name, std::vector<float> vertices, std::v
 
 
 
-__global__ void create_meshes_d(unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels) {
+__global__ void create_meshes_d(unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 
 	}
@@ -138,7 +149,31 @@ __global__ void create_meshes_d(unsigned char* imdata, int *widths, int *heights
 // - maybe input a structure to hold all of the triangles
 // - and an array of offsets to know where each obj starts
 // - also need size of obj to know where it ends
-void create_meshes(std::vector<std::string> objs) {
+void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &num_data, int& size) {
+	//size is the size in bytes of all the meshes
+	//num_data is the number of triangles for a mesh
+	
+	std::vector<unsigned> num_t;	//to hold the number of triangles for a mesh on the host
+	num_t.resize(objs.size());
+	
+	std::vector<std::string> file_dirs;
+	file_dirs.resize(objs.size());
+	//figuring out the file directory for a particular obj
+	
+	//const char *to_find = "/";
+	
+	for (int i = 0; i < objs.size(); i++) {
+		file_dirs[i] = "";
+
+		std::string temp_string = objs[i];
+		reverse(temp_string.begin(), temp_string.end());
+
+		int char_until_back = temp_string.find("/");	//characters until backslash
+
+		file_dirs[i].append(temp_string, char_until_back, temp_string.size() - char_until_back );
+		reverse(file_dirs[i].begin(), file_dirs[i].end() );
+	}
+
 	std::vector<std::vector<float>> vertices;
 	std::vector<std::vector<unsigned>> indices;
 	std::vector<std::vector<float>> uvs;
@@ -150,27 +185,93 @@ void create_meshes(std::vector<std::string> objs) {
 	uvs.resize(num);
 	tex_paths.resize(num);
 
-	unsigned no_textures = 0;
+	unsigned no_vert = 0, no_ind = 0, no_uv = 0;
+
+	//keeping track of the size of each constituent of the mesh
+	std::vector<unsigned> num_vert, num_ind, num_uv;
+	num_vert.resize(num);
+	num_ind.resize(num);
+	num_uv.resize(num);
+
+	//to convert the  vector<vector> of verticles to a single vector for passing to the gpu
+	std::vector<float> all_vert, all_uv;
+	std::vector<unsigned> all_ind;
+
+	//all_vert.resize(no_vert);
+	//all_ind.resize(no_ind);
+	//all_uv.resize(no_uv);
+
 	for (unsigned i = 0; i < objs.size(); i++) {
 		load_model(objs[i], vertices[i], indices[i], uvs[i], tex_paths[i]);
-		no_textures += tex_paths[i].size();
-	}
+		num_t[i] = indices[i].size()/3;	//3 indices make a triangle
+		no_vert += vertices[i].size();
+		no_ind += indices[i].size();
+		no_uv += uvs[i].size();
 
+		num_vert[i] = vertices[i].size();
+		num_ind[i] = indices[i].size();
+		num_uv[i] = uvs[i].size();
+
+		for (const auto& v : vertices[i]) {
+			all_vert.push_back(v);
+		}
+
+		for (const auto& n : indices[i]) {
+			all_ind.push_back(n);
+		}
+
+		for (const auto& u : uvs[i]) {
+			all_uv.push_back(u);
+		}
+
+
+		if (tex_paths[i].size() == 0) {
+			std::cerr << "Meshes without textures are not supported" << std::endl;
+			return;
+		} else if (tex_paths[i].size() > 1) {
+			std::cerr << "Meshes with more than 1 texture are not supported" << std::endl;
+			return;
+		}
+	}
+	
+	//copying the data to the gpu
+	thrust::device_ptr<float> vert_data;
+	thrust::device_ptr<float> uv_data;
+	thrust::device_ptr<unsigned> ind_data;
+
+	float *v_ptr = all_vert.data();	
+	upload_to_device(vert_data, v_ptr, all_vert.size() );	//upload_to_device defined in common.h
+
+	unsigned* i_ptr = all_ind.data();
+	upload_to_device(ind_data, i_ptr, all_ind.size() );
+
+	float *uv_ptr = all_uv.data();
+	upload_to_device(uv_data, uv_ptr, all_uv.size() );
+
+	unsigned *n_ptr = num_t.data();
+	upload_to_device(num_data, n_ptr, num_t.size() );
+
+
+
+
+	//reading in the images
 	thrust::device_ptr<unsigned char> imdata;
 	thrust::device_ptr<int> imwidths;
 	thrust::device_ptr<int> imhs;
 	thrust::device_ptr<int> imch;
 	
 	std::vector<const char*> image_locs;
-	image_locs.resize(no_textures);
-	unsigned counter = 0;
+	image_locs.resize(objs.size());
 	for (unsigned i = 0; i < objs.size(); i++) {
-		for (unsigned j = 0; j < tex_paths[i].size(); j++) {
-			image_locs[counter++] = tex_paths[i][j].c_str();
-		}
+		image_locs[i] = (file_dirs[i].append(tex_paths[i][0])).c_str();
 	}
-	
+
+	//creating the images
 	make_image(image_locs, imdata, imwidths, imhs, imch);
+
+	
+
+
 
 
 	/*have to copy host data over to device*/
@@ -179,5 +280,9 @@ void create_meshes(std::vector<std::string> objs) {
 	create_meshes_d<<<1,1>>>(thrust::raw_pointer_cast(imdata),
 				thrust::raw_pointer_cast(imwidths),
 				thrust::raw_pointer_cast(imhs),
-				thrust::raw_pointer_cast(imch) );
+				thrust::raw_pointer_cast(imch),
+		       		
+				thrust::raw_pointer_cast(vert_data),
+				thrust::raw_pointer_cast(ind_data),
+				thrust::raw_pointer_cast(uv_data));
 }
