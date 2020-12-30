@@ -134,7 +134,7 @@ void processNode(aiNode *node, const aiScene *scene, std::vector<float> &vertice
 void load_model(const std::string file_name, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
 	//https://learnopengl.com/Model-Loading/Model	
 	Assimp::Importer importer;
-	const aiScene *scene = importer.ReadFile(file_name, aiProcess_Triangulate | aiProcess_GenNormals /*| aiProcess_FlipUVS*/);	
+	const aiScene *scene = importer.ReadFile(file_name, aiProcess_Triangulate | aiProcess_GenNormals /*| aiProcess_FlipUVs*/);	
 			//aiProcess_Triangulate tells assimp to make the model entirely out of triangles
 			//aiProcess_GenNormals creates normal vectors for each vertex
 			//aiProcess_FlipUVS flips the texture coordinates on the y-axis
@@ -153,7 +153,7 @@ __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned nu
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 	
 		unsigned hit_counter = 0, ind_counter = 0;
-		unsigned ind_offset = 0;	//holds the total number of indices before the current obj
+		unsigned v_offset = 0, u_offset = 0, u_offset_t;	//holds the total number of indices before the current obj
 		image_texture* current_texture;	//the texture for the current obj
 		lambertian* current_material;
 		for (int i = 0; i < num_objs; i++) {
@@ -161,32 +161,34 @@ __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned nu
 			current_material = new lambertian(current_texture);
 			for (int j = 0; j < num_tris[i]; j++) {
 				//printf("j: %i/%i\n", j+1, num_tris[i]);
-				hits[hit_counter++] = new triangle( 	vec3(vertices[ 3*indices[ind_counter] + ind_offset],		//each element of indices refers to 1 vertex
-									     vertices[ 3*indices[ind_counter] + ind_offset + 1],	//each vertex has 3 elements - x,y,z
-									     vertices[ 3*indices[ind_counter] + ind_offset + 2]),	
+				hits[hit_counter++] = new triangle( 	vec3(vertices[ 3*indices[ind_counter] + v_offset],		//each element of indices refers to 1 vertex
+									     vertices[ 3*indices[ind_counter] + v_offset + 1],	//each vertex has 3 elements - x,y,z
+									     vertices[ 3*indices[ind_counter] + v_offset + 2]),	
 
-									vec3(vertices[ 3*indices[ind_counter+1] + ind_offset],
-									     vertices[ 3*indices[ind_counter+1] + ind_offset + 1],
-									     vertices[ 3*indices[ind_counter+1] + ind_offset + 2]),
+									vec3(vertices[ 3*indices[ind_counter+1] + v_offset],
+									     vertices[ 3*indices[ind_counter+1] + v_offset + 1],
+									     vertices[ 3*indices[ind_counter+1] + v_offset + 2]),
 
-									vec3(vertices[ 3*indices[ind_counter+2] + ind_offset],
-									     vertices[ 3*indices[ind_counter+2] + ind_offset + 1],
-									     vertices[ 3*indices[ind_counter+2] + ind_offset + 2]),
+									vec3(vertices[ 3*indices[ind_counter+2] + v_offset],
+									     vertices[ 3*indices[ind_counter+2] + v_offset + 1],
+									     vertices[ 3*indices[ind_counter+2] + v_offset + 2]),
 
-									uvs[3*indices[ind_counter] + ind_offset],
-									uvs[3*indices[ind_counter] + ind_offset+1],
+									uvs[2*indices[ind_counter] + u_offset],
+									uvs[2*indices[ind_counter] + u_offset+1],
 
-									uvs[3*indices[ind_counter+1] + ind_offset],
-									uvs[3*indices[ind_counter+1] + ind_offset+1],
+									uvs[2*indices[ind_counter+1] + u_offset],
+									uvs[2*indices[ind_counter+1] + u_offset+1],
 
-									uvs[3*indices[ind_counter+2] + ind_offset],
-									uvs[3*indices[ind_counter+2] + ind_offset+1],
+									uvs[2*indices[ind_counter+2] + u_offset],
+									uvs[2*indices[ind_counter+2] + u_offset+1],
 
 									current_material);
 
 				ind_counter += 3;
+				u_offset_t += 2;
 			}
-			ind_offset += ind_counter;//3*num_tris[i];
+			v_offset += ind_counter;//3*num_tris[i];
+			u_offset += u_offset_t;
 		}	
 	}
 
