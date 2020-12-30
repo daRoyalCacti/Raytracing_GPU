@@ -273,7 +273,9 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 
 
 	//objs = hits;	
+	
 	for (int i = 0; i < num_obj; i++) {
+		//printf("%i\n", i);
 		objs[i] = hits[i];
 	}
 	//first filling the sorted arrays
@@ -285,15 +287,12 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 	merge_sort(objs, n, obj_s[0], 0);
 	merge_sort(objs, n, obj_s[1], 1);
 	merge_sort(objs, n, obj_s[2], 2);
-
 	//the first node contains all objects
 	info[0].ids = new int[n];
 	for (int i = 0; i < n; i++)
 		info[0].ids[i] = i;
-
 	for (int node = 1; node < num_nodes(); node++)
 		info[node].ids = new int[info[node].num];
-	
 	//filling the nodes with the info about the objects they bound
 	for (int node = 0; node < num_nodes() - n; node++) {	//iterating through all nodes less the last row (each node modifies the ids of its children)
 		int axis = random_int(s, 0, 2);			

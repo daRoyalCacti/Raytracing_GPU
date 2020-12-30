@@ -146,8 +146,8 @@ struct image_texture : public texturez {
 		if (data == nullptr)	//if not texture data, return cyan color
 			return color(0, 1, 1);
 		//Clamp input texture coordinates to [0,1]^2
-		const auto uu = clamp_d(u, 0.0, 1.0);
-		const auto vv = 1.0 - clamp_d(v, 0.0, 1.0);	//Flip v to image coordinates
+		const auto uu = clamp_d(u, 0.0f, 1.0f);
+		const auto vv = 1.0 - clamp_d(v, 0.0f, 1.0f);	//Flip v to image coordinates
 
 		auto i = static_cast<int>(uu*width);
 		auto j = static_cast<int>(vv*height);
@@ -156,7 +156,7 @@ struct image_texture : public texturez {
 		if (i >= width)  i = width - 1;
 		if (j >= height) j = height - 1;
 
-		const auto color_scale = 1.0 / 255.0;	//to scale the input from [0,255] to [0,1]
+		const auto color_scale = 1.0f / 255.0f;	//to scale the input from [0,255] to [0,1]
 		const auto pixel = data + j*bytes_per_scanline + i*bytes_per_pixel + index;	//the pixel at coordinates (u,v)
 
 		return color(color_scale*pixel[0], color_scale*pixel[1], color_scale*pixel[2]);
@@ -192,17 +192,10 @@ void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned c
 
 	imread(impaths, ws, hs, nbChannels, imdata_h, totalSize);	//imread defined above
 
-	unsigned char* h_ptr = imdata_h.data();	
-	upload_to_device(imdata, h_ptr, imdata_h.size() );	//upload_to_device defined in common.h
-
-	int *ws_ptr = ws.data();
-	upload_to_device(imwidths, ws_ptr, ws.size() );
-
-	int *hs_ptr = hs.data();
-	upload_to_device(imhs, hs_ptr, hs.size() );
-
-	int *nb_ptr = nbChannels.data();
-	upload_to_device(imch, nb_ptr, nbChannels.size() );
+	upload_to_device(imdata, imdata_h );	//upload_to_device defined in common.h
+	upload_to_device(imwidths, ws);
+	upload_to_device(imhs, hs);
+	upload_to_device(imch, nbChannels);
 
 	/*for (int i = 0; i < imdata_h.size(); i++) {
 		stbi_image_free(imdata_h[i]);	//can free the cpu data since it has been uploaded to the gpu

@@ -70,16 +70,26 @@ __device__ inline float clamp_d(const float x, const float min, const float max)
 
 
 
-template <typename T>
-void upload_to_device(thrust::device_ptr<T> &d_ptr, std::vector<T> &h_ptr) {
-	d_ptr = thrust::device_ptr<T>(h_ptr.data() );
-}
+//uncomment - commented for debugging
+/*template <typename T>
+void upload_to_device(thrust::device_vector<T> &d_vec, std::vector<T> &h_ptr) {
+	//thrust::host_vector<T> h_vec = h_ptr;
+	//d_vec = h_vec;
+	
+	d_vec = h_ptr;
+}*/
 
 template <typename T>
 void upload_to_device(thrust::device_ptr<T> &d_ptr, T *h_ptr, int size) {
+	std::cout << "using old copy method" << std::endl;
 	d_ptr = thrust::device_malloc<T>(size);
 	for (int i = 0; i < size; i++) {
 		d_ptr[i] = h_ptr[i];
 	}
 }
 
+template <typename T>
+void upload_to_device(thrust::device_ptr<T> &d_ptr, std::vector<T> &h_ptr) {
+	d_ptr = thrust::device_malloc<T>(h_ptr.size());
+	thrust::copy(h_ptr.begin(), h_ptr.end(), d_ptr);	
+}

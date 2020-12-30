@@ -6,13 +6,14 @@
 
 
 int main() {
-	thrust::device_ptr<unsigned> num;
+	/*thrust::device_ptr<unsigned> num;
 	std::vector<std::string> objs;
+	hittable** hits;
 	int size;
 	objs.push_back("../assets/backpack/backpack.obj");
 	
-	create_meshes(objs, num, size);
-	/*
+	create_meshes(objs, hits, num, size);*/
+	
 	//start timing
 	const auto start = std::chrono::system_clock::now();
 	const std::time_t start_time = std::chrono::system_clock::to_time_t(start);
@@ -20,7 +21,7 @@ int main() {
 
 	
 	std::cerr << "Creating World                " << std::flush;
-	triangle_scene curr_scene;
+	door_scene curr_scene;
 
 
 	render_settings settings;
@@ -47,6 +48,6 @@ int main() {
 
 	const std::chrono::duration<double> elapsed_seconds = end - start;
 	std::cerr << "Elapsed time: " << elapsed_seconds.count() << "s  or  " << elapsed_seconds.count() / 60.0f << "m  or  " << elapsed_seconds.count() / (60.0f * 60.0f) << "h\n";
-*/
+
 	return 0;
 }

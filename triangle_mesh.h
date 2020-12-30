@@ -24,9 +24,19 @@ struct triangle_mesh : public hittable {
 		tris = new bvh_node(triangles, num, time0, time1, s);
 	}
 
-	__device__ triangle_mesh(hittable** triangles, int* num, const float time0, const float time1, curandState *s, int* offset, int id) {
+	__device__ triangle_mesh(hittable** triangles, unsigned* num, const float time0, const float time1, curandState *s, int id) {
+		//printf("va\n");
 		n = num[id];
-		tris = new bvh_node(triangles+ offset[id], num[id], time0, time1, s);
+		
+		int offset = 0;
+		for (int i = 0; i < id; i++) {
+			printf("%i\n", i);
+			offset += num[i];
+		}
+		//printf("a\n");
+		printf("Creating bvh_node");
+		tris = new bvh_node(triangles+offset, num[id], time0, time1, s);
+		//printf("b\n");
 	}
 
 	/*__device__ triangle_mesh(float* verts, int num_v, unsigned* inds, int num_i,  float* uvs, int num_uvs,  unsigned tex_id, hittable** temp_hittables) {
@@ -139,22 +149,70 @@ void load_model(const std::string file_name, std::vector<float> &vertices, std::
 
 
 
-__global__ void create_meshes_d(unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs) {
+__global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned num_objs, unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+	
+		unsigned hit_counter = 0, ind_counter = 0;
+		unsigned ind_offset = 0;	//holds the total number of indices before the current obj
+		image_texture* current_texture;	//the texture for the current obj
+		lambertian* current_material;
+		for (int i = 0; i < num_objs; i++) {
+			current_texture = new image_texture(imdata, widths, heights, bytes_per_pixels, i);
+			current_material = new lambertian(current_texture);
+			for (int j = 0; j < num_tris[i]; j++) {
+				//printf("j: %i/%i\n", j+1, num_tris[i]);
+				hits[hit_counter++] = new triangle( 	vec3(vertices[ 3*indices[ind_counter] + ind_offset],		//each element of indices refers to 1 vertex
+									     vertices[ 3*indices[ind_counter] + ind_offset + 1],	//each vertex has 3 elements - x,y,z
+									     vertices[ 3*indices[ind_counter] + ind_offset + 2]),	
 
+									vec3(vertices[ 3*indices[ind_counter+1] + ind_offset],
+									     vertices[ 3*indices[ind_counter+1] + ind_offset + 1],
+									     vertices[ 3*indices[ind_counter+1] + ind_offset + 2]),
+
+									vec3(vertices[ 3*indices[ind_counter+2] + ind_offset],
+									     vertices[ 3*indices[ind_counter+2] + ind_offset + 1],
+									     vertices[ 3*indices[ind_counter+2] + ind_offset + 2]),
+
+									uvs[3*indices[ind_counter] + ind_offset],
+									uvs[3*indices[ind_counter] + ind_offset+1],
+
+									uvs[3*indices[ind_counter+1] + ind_offset],
+									uvs[3*indices[ind_counter+1] + ind_offset+1],
+
+									uvs[3*indices[ind_counter+2] + ind_offset],
+									uvs[3*indices[ind_counter+2] + ind_offset+1],
+
+									current_material);
+
+				ind_counter += 3;
+			}
+			ind_offset += ind_counter;//3*num_tris[i];
+		}	
 	}
+
+
+}
+
+
+__global__ void meshes_free(unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs) {
+	delete [] imdata;
+	delete [] widths;
+	delete [] heights;
+	delete [] bytes_per_pixels;
+	delete [] vertices;
+	delete [] indices;
+	delete [] uvs;
 }
 
 // need to also take some input that will actually be passed on the main scene creation
 // - maybe input a structure to hold all of the triangles
 // - and an array of offsets to know where each obj starts
 // - also need size of obj to know where it ends
-void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &num_data, int& size) {
+void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::device_ptr<unsigned> &num_data, int& size) {
 	//size is the size in bytes of all the meshes
 	//num_data is the number of triangles for a mesh
 	
-	std::vector<unsigned> num_t;	//to hold the number of triangles for a mesh on the host
-	num_t.resize(objs.size());
+	
 	
 	std::vector<std::string> file_dirs;
 	file_dirs.resize(objs.size());
@@ -162,18 +220,21 @@ void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &
 	
 	//const char *to_find = "/";
 	
+
+	std::cout << "finding directories" << std::endl;
 	for (int i = 0; i < objs.size(); i++) {
 		file_dirs[i] = "";
 
 		std::string temp_string = objs[i];
 		reverse(temp_string.begin(), temp_string.end());
 
-		int char_until_back = temp_string.find("/");	//characters until backslash
+		int char_until_back = temp_string.find("/");	//characters until forwardslash
 
 		file_dirs[i].append(temp_string, char_until_back, temp_string.size() - char_until_back );
 		reverse(file_dirs[i].begin(), file_dirs[i].end() );
 	}
 
+	//the structures the meshes should be read into
 	std::vector<std::vector<float>> vertices;
 	std::vector<std::vector<unsigned>> indices;
 	std::vector<std::vector<float>> uvs;
@@ -184,6 +245,9 @@ void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &
 	indices.resize(num);
 	uvs.resize(num);
 	tex_paths.resize(num);
+
+	std::vector<unsigned> num_t;	//to hold the number of triangles for a mesh on the host
+	num_t.resize(num);
 
 	unsigned no_vert = 0, no_ind = 0, no_uv = 0;
 
@@ -197,13 +261,14 @@ void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &
 	std::vector<float> all_vert, all_uv;
 	std::vector<unsigned> all_ind;
 
-	//all_vert.resize(no_vert);
-	//all_ind.resize(no_ind);
-	//all_uv.resize(no_uv);
+	
+	int num_triangles = 0;
 
+	std::cout << "making the meshes" << std::endl;
 	for (unsigned i = 0; i < objs.size(); i++) {
 		load_model(objs[i], vertices[i], indices[i], uvs[i], tex_paths[i]);
 		num_t[i] = indices[i].size()/3;	//3 indices make a triangle
+		num_triangles += num_t[i];
 		no_vert += vertices[i].size();
 		no_ind += indices[i].size();
 		no_uv += uvs[i].size();
@@ -239,21 +304,14 @@ void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &
 	thrust::device_ptr<float> uv_data;
 	thrust::device_ptr<unsigned> ind_data;
 
-	float *v_ptr = all_vert.data();	
-	upload_to_device(vert_data, v_ptr, all_vert.size() );	//upload_to_device defined in common.h
-
-	unsigned* i_ptr = all_ind.data();
-	upload_to_device(ind_data, i_ptr, all_ind.size() );
-
-	float *uv_ptr = all_uv.data();
-	upload_to_device(uv_data, uv_ptr, all_uv.size() );
-
-	unsigned *n_ptr = num_t.data();
-	upload_to_device(num_data, n_ptr, num_t.size() );
+	upload_to_device(vert_data, all_vert);	//upload_to_device defined in common.h
+	upload_to_device(ind_data, all_ind);
+	upload_to_device(uv_data, all_uv);
+	upload_to_device(num_data, num_t);
 
 
 
-
+	std::cout << "making images" << std::endl;
 	//reading in the images
 	thrust::device_ptr<unsigned char> imdata;
 	thrust::device_ptr<int> imwidths;
@@ -269,15 +327,15 @@ void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &
 	//creating the images
 	make_image(image_locs, imdata, imwidths, imhs, imch);
 
+	checkCudaErrors(cudaMalloc((void**)&hits, num_triangles*sizeof(triangle*) ));
+
 	
+	std::cout << "main" << std::endl;
 
-
-
-
-	/*have to copy host data over to device*/
-
-
-	create_meshes_d<<<1,1>>>(thrust::raw_pointer_cast(imdata),
+	create_meshes_d<<<1, 1>>>(hits, thrust::raw_pointer_cast(num_data), 
+				//thrust::raw_pointer_cast(num_obj),
+				objs.size(),
+				thrust::raw_pointer_cast(imdata),
 				thrust::raw_pointer_cast(imwidths),
 				thrust::raw_pointer_cast(imhs),
 				thrust::raw_pointer_cast(imch),
@@ -285,4 +343,33 @@ void create_meshes(std::vector<std::string> objs, thrust::device_ptr<unsigned> &
 				thrust::raw_pointer_cast(vert_data),
 				thrust::raw_pointer_cast(ind_data),
 				thrust::raw_pointer_cast(uv_data));
+	
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the meshes are created
+
+	std::cout << "Cleanup" << std::endl;
+	/*meshes_free<<<1, 1>>>(thrust::raw_pointer_cast(imdata),
+				thrust::raw_pointer_cast(imwidths),
+				thrust::raw_pointer_cast(imhs),
+				thrust::raw_pointer_cast(imch),
+		       		
+				thrust::raw_pointer_cast(vert_data),
+				thrust::raw_pointer_cast(ind_data),
+				thrust::raw_pointer_cast(uv_data));
+
+
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(imdata) ));
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(imwidths) ));
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(imhs) ));
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(imch) ));
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(vert_data) ));
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(ind_data) ));
+	checkCudaErrors(cudaFree(thrust::raw_pointer_cast(uv_data) ));*/
+
+	size = 0;
+	for (int i = 0; i < objs.size(); i++) {
+		size += size_of_bvh(num_t[i]);
+	}
+	/*size += num_triangles*sizeof(hittable*);
+	size += num_t.size() * sizeof(unsigned);*/
 }

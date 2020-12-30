@@ -41,12 +41,18 @@ class camera {
 											//focus_dist*w because this makes the light come from the lense of the camera
 											// not just the camera itself
 		lens_radius = aperture/2;
+		//printf("%f\n", focus_dist);
+		//printf("%f\n", lens_radius);
+		//printf("%f\n", theta);
 	}
 
 	__device__ inline ray get_ray(curandState *state, const float s, const float t) const {
 		//uses the thin lens approximation to generate depth of field
+		//printf("z\n");
 		const vec3 rd = lens_radius * random_in_unit_disk(state);	//randomness is required to get the blur
+		//printf("y\n");
 		const vec3 offset = u * rd.x() + v*rd.y();		//offset for where the light is coming from
+		//printf("x\n");
 
 		return ray(origin + offset, lower_left_corner + s*horizontal + t*vertical - origin - offset, random_float(state, time0, time1));	//random time to simulate motion blur
 	}

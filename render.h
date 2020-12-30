@@ -58,15 +58,19 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 	color cur_col(1,1,1);
 
 	for (int i = 0; i < depth; i++) {
+		//printf("i=%i\n", i);
 		hit_record rec;
 
+		//printf("a\n");
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
 			return cur_attenuation*background;
 
 		ray scattered;
 		color attenuation;
+		//printf("b\n");
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
 		
+		//printf("c\n");
 		if (rec.mat_ptr->scatter(cur_ray, rec, attenuation, scattered, local_rand_state)) {
 			cur_col = emitted + cur_attenuation*cur_col;
 			cur_attenuation *= attenuation;
@@ -75,6 +79,7 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 			return cur_attenuation*emitted;
 		}
 
+		//printf("d\n");
 
 	}
 	return color(0,0,0);	//exceeded recursion
@@ -102,10 +107,13 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	vec3 col(0,0,0);
 	
 	for(int s=0; s < ns; s++) {
-		float u = float(i +random_float(&local_rand_state)) / max_x;
+		//printf("s=%i\n", s);
+		float u = float(i+random_float(&local_rand_state)) / max_x;
 		float v = float(j+random_float(&local_rand_state)) / max_y;
 		
+		//printf("1\n");
 		ray r = (*cam)->get_ray(rand_state, u,v);
+		//printf("2\n");
 		col += color_f(r, world, &local_rand_state, max_depth, back);
 	}
 
