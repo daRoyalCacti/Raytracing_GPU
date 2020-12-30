@@ -133,7 +133,7 @@ int size_of_bvh(int n) {
 struct bvh_node : public hittable {
 	hittable** objs;	//the actual objects
 	__device__ bvh_node(){}
-	__device__ bvh_node(hittable** hits, int num_obj, const float time0, const float time1, curandState *s);
+	__device__ bvh_node(hittable** &hits, int num_obj, const float time0, const float time1, curandState *s, int offset = 0);
 	node_info* info;
 	int n;	//number of objects associated to the tree
 	aabb* bounds;	//the bounding boxes for each node of the tree
@@ -267,7 +267,7 @@ __device__ bvh_node::bvh_node(int num_obj) : n(num_obj) {
 }
 
 
-__device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, const float time1, curandState *s) : bvh_node(num_obj) {
+__device__ bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0, const float time1, curandState *s, int offset) : bvh_node(num_obj) {
 	
 	objs = new hittable*[num_obj];
 
@@ -276,7 +276,7 @@ __device__ bvh_node::bvh_node(hittable** hits, int  num_obj, const float time0, 
 	
 	for (int i = 0; i < num_obj; i++) {
 		//printf("%i\n", i);
-		objs[i] = hits[i];
+		objs[i] = hits[i+offset];
 	}
 	//first filling the sorted arrays
 	

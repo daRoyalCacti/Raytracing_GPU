@@ -478,6 +478,7 @@ struct triangles_scene : public scene {
 __global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable** obj_list, unsigned* obj_sizes) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
+		printf("%i\n", obj_sizes[0]);
 		d_list[0] = new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
 
 		d_list[1] = new sphere(vec3(0,-102.5,-1), 100, new lambertian(vec3(0, 0, 1)));
@@ -505,6 +506,8 @@ struct door_scene : public scene {
 		
 		create_meshes(objs, obj_list, num, size_of_meshes);
 
+		
+
 		curandState* rand_state;
 		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
 
@@ -529,5 +532,71 @@ struct door_scene : public scene {
 
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+
+	}
+};
+
+
+
+
+__global__ void create_zdoor_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable** obj_list, unsigned* obj_sizes) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		
+		for (int i = 0; i < 4338; i++) {
+			d_list[i] = obj_list[i];
+		}
+		
+		d_list[4338] = new sphere(vec3(0,-102.5,-1), 100, new lambertian(vec3(0, 0, 1)));
+
+		*d_world    = new hittable_list(d_list, 4339);
+		*d_camera   = new camera(vec3(0,0,-5), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
+		//*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 40, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
+
+	}
+	
+}
+
+
+
+
+
+struct zdoor_scene : public scene {
+	zdoor_scene() : scene(16.0f/9.0f, background_color::sky) {
+		thrust::device_ptr<unsigned> num;
+		std::vector<std::string> objs;
+		hittable** obj_list;
+		int size_of_meshes;
+		//objs.push_back("../assets/backpack/backpack.obj");
+		objs.push_back("../assets/test/test.obj");
+		
+		create_meshes(objs, obj_list, num, size_of_meshes);
+
+		
+
+		curandState* rand_state;
+		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
+
+		world_init<<<1,1>>>(rand_state);	//intialising rand_state
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+		
+		//std::cout << size_of_meshes << std::endl;
+/*
+
+		int size_of_meshes = 0;
+		for (int i = 0; i < objs.size(); i++) {
+			size_of_meshes += size_of_bvh(num[i]);
+		}
+		*/
+		
+		//size_of_meshes = 13391680;
+		checkCudaErrors(cudaMalloc((void**)&d_list, 4338*sizeof(triangle*) + sizeof(hittable*) ));	//+hittable* because of ground
+
+		no_hittables = 4339;
+		create_zdoor_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, obj_list, thrust::raw_pointer_cast(num));
+
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+
 	}
 };

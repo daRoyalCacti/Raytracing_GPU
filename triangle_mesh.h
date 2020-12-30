@@ -19,12 +19,12 @@ struct triangle_mesh : public hittable {
 	int n;		//number of triangles
 	
 	__device__ triangle_mesh() {}
-	__device__ triangle_mesh(hittable** triangles, int num, const float time0, const float time1, curandState *s) {
+	__device__ triangle_mesh(hittable** &triangles, int num, const float time0, const float time1, curandState *s) {
 		n = num;
 		tris = new bvh_node(triangles, num, time0, time1, s);
 	}
 
-	__device__ triangle_mesh(hittable** triangles, unsigned* num, const float time0, const float time1, curandState *s, int id) {
+	__device__ triangle_mesh(hittable** &triangles, unsigned* num, const float time0, const float time1, curandState *s, int id) {
 		//printf("va\n");
 		n = num[id];
 		
@@ -34,8 +34,11 @@ struct triangle_mesh : public hittable {
 			offset += num[i];
 		}
 		//printf("a\n");
-		printf("Creating bvh_node");
-		tris = new bvh_node(triangles+offset, num[id], time0, time1, s);
+		printf("%i\n", num[0]);
+		printf("Creating bvh_node\n");
+		printf("triangle_mesh constructor wrong\n");
+
+		tris = new bvh_node(triangles/*+offset*/, num[id], time0, time1, s, offset);
 		//printf("b\n");
 	}
 
@@ -80,7 +83,7 @@ void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> &vertice
 		// - aiProcess_Triangulate means these faces are always triangles
 		//Iterate over all the faces and store the face's indices
 
-		aiFace face = mesh->mFaces[i];
+		const aiFace face = mesh->mFaces[i];
 		for (unsigned j = 0; j < face.mNumIndices; j++) {
 			indices.push_back(face.mIndices[j]);
 		}
@@ -152,6 +155,7 @@ void load_model(const std::string file_name, std::vector<float> &vertices, std::
 __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned num_objs, unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 	
+		printf("%i\n", num_tris[0]);
 		unsigned hit_counter = 0, ind_counter = 0;
 		unsigned v_offset = 0, u_offset = 0, u_offset_t;	//holds the total number of indices before the current obj
 		image_texture* current_texture;	//the texture for the current obj
@@ -219,10 +223,6 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 	std::vector<std::string> file_dirs;
 	file_dirs.resize(objs.size());
 	//figuring out the file directory for a particular obj
-	
-	//const char *to_find = "/";
-	
-
 	std::cout << "finding directories" << std::endl;
 	for (int i = 0; i < objs.size(); i++) {
 		file_dirs[i] = "";
@@ -274,6 +274,8 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 		no_vert += vertices[i].size();
 		no_ind += indices[i].size();
 		no_uv += uvs[i].size();
+
+		std::cout << "indices : " << indices[i].size() << "\tvertices : " << vertices[i].size() << "\tuvs : " << uvs[i].size() << "\ttriangles : " << num_t[i] << std::endl;
 
 		num_vert[i] = vertices[i].size();
 		num_ind[i] = indices[i].size();

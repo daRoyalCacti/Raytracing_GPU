@@ -63,6 +63,24 @@ struct triangle : public hittable {
 		if (vertex2.z() > max_z)
 			max_z = vertex2.z();
 
+		//printf("vertices : (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f), (%.3f, %.3f, %.3f)\n", vertex0.x(), vertex0.y(), vertex0.z(), vertex1.x(), vertex1.y(), vertex1.z(), vertex2.x(), vertex2.y(), vertex2.z() );
+		//printf("aabb     : (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f)\n\n", min_x, min_y, min_z, max_x, max_y, max_z);
+		
+		const float small = 0.0001;
+		const float epsilon = 0.000001;
+		if (fabsf(min_x - max_x) < epsilon) {
+			max_x += small;
+			min_x -= small;
+		}
+		if (fabsf(min_y - max_y) < epsilon) {
+			max_y += small;
+			min_y -= small;
+		}
+		if (fabsf(min_z - max_z) < epsilon) {
+			max_z += small;
+			min_z -= small;
+		}
+
 		//creating the bounding box
 		output_box = aabb(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z) );
 		return true;
@@ -85,7 +103,7 @@ __device__ bool triangle::hit(const ray& r, const float t_min, const float t_max
 	if (a > -epsilon && a < epsilon)	//ray is parallel to triangle
 		return false;
 
-	f = 1.0 / a;
+	f = 1.0f / a;
 	s = r.orig - vertex0;
 	u = f * dot(s, h);
 
@@ -101,12 +119,12 @@ __device__ bool triangle::hit(const ray& r, const float t_min, const float t_max
 	//computing the time of intersection
 	const float t = f * dot(v1, q);
 
-	if (t < t_min || t > t_max)	//time of intersection falls outside of time range considered
+	if (t < t_min || t > t_max || t < epsilon)	//time of intersection falls outside of time range considered
 		return false;
 
 	rec.t = t;
 
-	rec.set_face_normal(r, cross(v0, v1) );
+	rec.set_face_normal(r, cross(v1, v0) );
 	rec.mat_ptr = mp;
 	rec.p = r.at(t);
 
