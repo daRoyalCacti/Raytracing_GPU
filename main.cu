@@ -6,14 +6,7 @@
 
 
 int main() {
-	/*thrust::device_ptr<unsigned> num;
-	std::vector<std::string> objs;
-	hittable** hits;
-	int size;
-	objs.push_back("../assets/backpack/backpack.obj");
-	
-	create_meshes(objs, hits, num, size);*/
-	
+
 	//start timing
 	const auto start = std::chrono::system_clock::now();
 	const std::time_t start_time = std::chrono::system_clock::to_time_t(start);
@@ -29,7 +22,7 @@ int main() {
 
 	settings.image_width = 1200;
 	settings.no_fb = 10;
-	settings.samples_per_pixel_per_fb = 10;
+	settings.samples_per_pixel_per_fb = 100;
 	settings.aspect_ratio = curr_scene.aspect;
 
 	settings.calc_all();

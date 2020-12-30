@@ -271,15 +271,11 @@ __device__ bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0,
 	
 	objs = new hittable*[num_obj];
 
-
-	//objs = hits;	
-	
 	for (int i = 0; i < num_obj; i++) {
-		//printf("%i\n", i);
 		objs[i] = hits[i+offset];
 	}
-	//first filling the sorted arrays
 	
+	//first filling the sorted arrays
 	obj_s[0] = new int[n];
 	obj_s[1] = new int[n];
 	obj_s[2] = new int[n];

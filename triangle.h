@@ -141,8 +141,10 @@ __device__ bool triangle::hit(const ray& r, const float t_min, const float t_max
 	const float Bary1 = (d00 * d21 - d01 * d20) * invDenom;
 	const float Bary2 = 1.0f - Bary0 - Bary1;
 
-	rec.u = Bary0*u_0 + Bary1*u_1 + Bary2*u_2; 
-	rec.v = Bary0*v_0 + Bary1*v_1 + Bary2*v_2; 
+
+	//https://computergraphics.stackexchange.com/questions/1866/how-to-map-square-texture-to-triangle
+	rec.u = Bary2*u_0 + Bary0*u_1 + Bary1*u_2; 
+	rec.v = Bary2*v_0 + Bary0*v_1 + Bary1*v_2; 
 
 	return true;	
 }
