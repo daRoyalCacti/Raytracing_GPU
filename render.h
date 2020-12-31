@@ -165,13 +165,9 @@ void draw(scene& curr_scene, render_settings settings) {
 
 
 	std::cerr << "\rAveraging Frame Buffers         " << std::flush;
-	average_images(temp_file_dir, "image.ppm");
-
-	std::cerr << "\rConverting image to png" << std::flush;
-	system("./to_png.sh");
+	average_images(temp_file_dir, "image.png");
 
 	std::cerr << "\rDeleting temp files" << std::flush;
-	remove("image.ppm");
 	std::filesystem::path pathToDelete(temp_file_dir);
 	remove_all(pathToDelete);
 

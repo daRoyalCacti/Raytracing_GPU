@@ -6,7 +6,7 @@ NVCC           = $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER)
 #NVCC_DBG       = -g -G
 NVCC_DBG       =
 
-NVCCFLAGS      = $(NVCC_DBG) -m64 -std=c++17 -lassimp
+NVCCFLAGS      = $(NVCC_DBG) -m64 -std=c++17 -lassimp -lpng
 GENCODE_FLAGS  = -gencode arch=compute_60,code=sm_60
 
 #Generate: Generate.o
@@ -16,14 +16,14 @@ GENCODE_FLAGS  = -gencode arch=compute_60,code=sm_60
 #	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) -o Generate.o -c ../main.cu
 
 Generate: ../main.cu
-	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) -o Generate ../main.cu -I.
+	$(NVCC) `libpng-config --cflags --ldflags` $(NVCCFLAGS) $(GENCODE_FLAGS) -o Generate ../main.cu -I.
 
 profile_basic: Generate
-	nvprof ./Generate > out.ppm
+	nvprof ./Generate
 
 # use nvprof --query-metrics
 profile_metrics: Generate
-	nvprof --metrics achieved_occupancy,inst_executed,inst_fp_32,inst_fp_64,inst_integer ./Generate > out.ppm
+	nvprof --metrics achieved_occupancy,inst_executed,inst_fp_32,inst_fp_64,inst_integer ./Generate
 
 clean:
 	rm -f Generate Generate.o

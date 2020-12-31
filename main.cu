@@ -22,7 +22,7 @@ int main() {
 
 	settings.image_width = 1200;
 	settings.no_fb = 10;
-	settings.samples_per_pixel_per_fb = 100;
+	settings.samples_per_pixel_per_fb = 10;
 	settings.aspect_ratio = curr_scene.aspect;
 
 	settings.calc_all();

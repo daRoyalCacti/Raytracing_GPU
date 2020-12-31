@@ -1,5 +1,9 @@
 #pragma once
 
+#include <png++/png.hpp>	//for writing pngs
+
+
+
 #include "vec3.h"
 
 #include <iostream>
@@ -133,10 +137,8 @@ void average_images(std::string file_dir, std::string output_loc) {
 		input.close();
 	}
 
-
-	std::ofstream out;
-	out.open(output_loc);
-	out << "P3\n" << img_w << " " << img_h << "\n255\n";
+	//https://www.nongnu.org/pngpp/doc/0.2.9/
+	png::image<png::rgb_pixel> image(img_w, img_h);
 	for (int j = 0; j<img_h; j++) 
 		for (int i = 0; i <img_w; i++) {
 			const size_t pixel_index = j*img_w + i;
@@ -155,13 +157,14 @@ void average_images(std::string file_dir, std::string output_loc) {
 			g = sqrt(g);
 			b = sqrt(b);
 
-			//write the color scaled to be in [0, 255]
-			out << static_cast<int>(256 * clamp(r, 0, 0.999)) << ' '
-				<< static_cast<int>(256 * clamp(g, 0, 0.999)) << ' '
-				<< static_cast<int>(256 * clamp(b, 0, 0.999)) << '\n';
+			//color scaled to be in [0, 255]
+			int r_w = static_cast<int>(256 * clamp(r, 0, 0.999));
+			int g_w = static_cast<int>(256 * clamp(g, 0, 0.999));
+			int b_w = static_cast<int>(256 * clamp(b, 0, 0.999));
 
-						
+			image[j][i] = png::rgb_pixel(r_w,g_w,b_w);
 		}
-	out.close();
+
+	image.write(output_loc);
 
 }
