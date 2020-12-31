@@ -98,7 +98,7 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 	if((i >= max_x) || (j >= max_y)) return;	//if trying the work with more values than wanted
 	int pixel_index = j*max_x + i;
 
-	curandState local_rand_state = rand_state[(id*pixel_index + id)%(max_y*max_x)];
+	curandState local_rand_state = rand_state[((id+1)*pixel_index + id+1)%(max_y*max_x)];
 	vec3 col(0,0,0);
 	
 	for(int s=0; s < ns; s++) {
@@ -167,10 +167,10 @@ void draw(scene& curr_scene, render_settings settings) {
 	std::cerr << "\rAveraging Frame Buffers         " << std::flush;
 	average_images(temp_file_dir, "image.ppm");
 
-	std::cerr << "\rConverting image to png" << std::endl;
+	std::cerr << "\rConverting image to png" << std::flush;
 	system("./to_png.sh");
 
-	std::cerr << "Deleting temp files" << std::endl;
+	std::cerr << "\rDeleting temp files" << std::flush;
 	remove("image.ppm");
 	std::filesystem::path pathToDelete(temp_file_dir);
 	remove_all(pathToDelete);

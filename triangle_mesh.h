@@ -48,15 +48,18 @@ struct triangle_mesh : public hittable {
 
 
 
-void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
+void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths, std::vector<float> &norms) {
 	
 	for (unsigned i = 0; i < mesh->mNumVertices; i++) {
-		//process vertex positions and texture coordinates
-		//will also do normals here when they get added
+		//process vertex positions, normals and texture coordinates
 
 		vertices.push_back(mesh->mVertices[i].x);
 		vertices.push_back(mesh->mVertices[i].y);
 		vertices.push_back(mesh->mVertices[i].z);
+
+		norms.push_back(mesh->mNormals[i].x);
+		norms.push_back(mesh->mNormals[i].y);
+		norms.push_back(mesh->mNormals[i].z);
 		
 		if (mesh->mTextureCoords[0]) {	//does the mesh contiain texture coords
 			uvs.push_back(mesh->mTextureCoords[0][i].x);
@@ -109,21 +112,21 @@ void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> &vertice
 }
 
 
-void processNode(aiNode *node, const aiScene *scene, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
+void processNode(aiNode *node, const aiScene *scene, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths, std::vector<float> &norms) {
 	//process all the node's meshes
 	for (unsigned i = 0; i < node->mNumMeshes; i++) {
 		aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-		processMesh(mesh, scene, vertices, indices, uvs, tex_paths);
+		processMesh(mesh, scene, vertices, indices, uvs, tex_paths, norms);
 	}
 
 	//process the meshes of all the nodes children
 	for (unsigned i = 0; i < node->mNumChildren; i++) {
-		processNode(node->mChildren[i], scene, vertices, indices, uvs, tex_paths);
+		processNode(node->mChildren[i], scene, vertices, indices, uvs, tex_paths, norms);
 	}
 }
 
 
-void load_model(const std::string file_name, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths) {
+void load_model(const std::string file_name, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths, std::vector<float> &norms) {
 	//https://learnopengl.com/Model-Loading/Model	
 	Assimp::Importer importer;
 	const aiScene *scene = importer.ReadFile(file_name, aiProcess_Triangulate | aiProcess_GenNormals /*| aiProcess_FlipUVs*/);	
@@ -136,12 +139,12 @@ void load_model(const std::string file_name, std::vector<float> &vertices, std::
 		return;
 	}
 
-	processNode(scene->mRootNode, scene, vertices, indices, uvs, tex_paths);
+	processNode(scene->mRootNode, scene, vertices, indices, uvs, tex_paths, norms);
 }
 
 
 
-__global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned num_objs, unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs) {
+__global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned num_objs, unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs, float* norms) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 	
 		unsigned hit_counter = 0, ind_counter = 0;
@@ -164,6 +167,19 @@ __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned nu
 									     vertices[ 3*indices[ind_counter+2] + v_offset + 1],
 									     vertices[ 3*indices[ind_counter+2] + v_offset + 2]),
 
+									vec3(norms[ 3*indices[ind_counter] + v_offset],		//each element of indices refers to 1 normal
+									     norms[ 3*indices[ind_counter] + v_offset + 1],		//each normal has 3 elements - x,y,z
+									     norms[ 3*indices[ind_counter] + v_offset + 2]),	
+
+									vec3(norms[ 3*indices[ind_counter+1] + v_offset],
+									     norms[ 3*indices[ind_counter+1] + v_offset + 1],
+									     norms[ 3*indices[ind_counter+1] + v_offset + 2]),
+
+									vec3(norms[ 3*indices[ind_counter+2] + v_offset],
+									     norms[ 3*indices[ind_counter+2] + v_offset + 1],
+									     norms[ 3*indices[ind_counter+2] + v_offset + 2]),
+
+
 									uvs[2*indices[ind_counter] + u_offset],
 									uvs[2*indices[ind_counter] + u_offset+1],
 
@@ -173,6 +189,7 @@ __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned nu
 									uvs[2*indices[ind_counter+2] + u_offset],
 									uvs[2*indices[ind_counter+2] + u_offset+1],
 
+								
 									current_material);
 
 				ind_counter += 3;
@@ -212,43 +229,29 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 	std::vector<std::vector<unsigned>> indices;
 	std::vector<std::vector<float>> uvs;
 	std::vector<std::vector<std::string>> tex_paths;
+	std::vector<std::vector<float>> norms;
 
 	const int num = objs.size();
 	vertices.resize(num);
 	indices.resize(num);
 	uvs.resize(num);
 	tex_paths.resize(num);
+	norms.resize(num);
 
 	std::vector<unsigned> num_t;	//to hold the number of triangles for a mesh on the host
 	num_t.resize(num);
 
-	unsigned no_vert = 0, no_ind = 0, no_uv = 0;
-
-	//keeping track of the size of each constituent of the mesh
-	std::vector<unsigned> num_vert, num_ind, num_uv;
-	num_vert.resize(num);
-	num_ind.resize(num);
-	num_uv.resize(num);
-
 	//to convert the  vector<vector> of verticles to a single vector for passing to the gpu
-	std::vector<float> all_vert, all_uv;
+	std::vector<float> all_vert, all_uv, all_norm;
 	std::vector<unsigned> all_ind;
 
 	
 	int num_triangles = 0;
 
 	for (unsigned i = 0; i < objs.size(); i++) {
-		load_model(objs[i], vertices[i], indices[i], uvs[i], tex_paths[i]);
+		load_model(objs[i], vertices[i], indices[i], uvs[i], tex_paths[i], norms[i]);
 		num_t[i] = indices[i].size()/3;	//3 indices make a triangle
 		num_triangles += num_t[i];
-		no_vert += vertices[i].size();
-		no_ind += indices[i].size();
-		no_uv += uvs[i].size();
-
-
-		num_vert[i] = vertices[i].size();
-		num_ind[i] = indices[i].size();
-		num_uv[i] = uvs[i].size();
 
 		for (const auto& v : vertices[i]) {
 			all_vert.push_back(v);
@@ -260,6 +263,10 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 
 		for (const auto& u : uvs[i]) {
 			all_uv.push_back(u);
+		}
+
+		for (const auto& n : norms[i]) {
+			all_norm.push_back(n);
 		}
 
 
@@ -276,11 +283,13 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 	thrust::device_ptr<float> vert_data;
 	thrust::device_ptr<float> uv_data;
 	thrust::device_ptr<unsigned> ind_data;
+	thrust::device_ptr<float> norm_data;
 
 	upload_to_device(vert_data, all_vert);	//upload_to_device defined in common.h
 	upload_to_device(ind_data, all_ind);
 	upload_to_device(uv_data, all_uv);
 	upload_to_device(num_data, num_t);
+	upload_to_device(norm_data, all_norm);
 
 
 
@@ -313,7 +322,8 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 		       		
 				thrust::raw_pointer_cast(vert_data),
 				thrust::raw_pointer_cast(ind_data),
-				thrust::raw_pointer_cast(uv_data));
+				thrust::raw_pointer_cast(uv_data),
+				thrust::raw_pointer_cast(norm_data));
 	
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the meshes are created

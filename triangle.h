@@ -10,11 +10,16 @@ struct triangle : public hittable {
 	vec3 S, T;	//orthonormal vectors on the plane of the triangle
 	vec3 v0, v1;	//edges of the triangle
 	float d00, d01, d11, invDenom;	//helpful quantities for finding texture coords
+
+	bool vertex_normals;	//whether to use face normals or vertex normals
+
+	vec3 normal0, normal1, normal2;	//vertex normals (do not have to be set) 
 	
 	__device__ triangle() {}
 	__device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
 		: vertex0(vec0), vertex1(vec1), vertex2(vec2), u_0(u0_), v_0(v0_), u_1(u1_), v_1(v1_), u_2(u2_), v_2(v2_),  mp(mat) {
 
+		vertex_normals = false;
 		//precomuting some quantities to find the uv coordinates
 		//https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates	
 		v0 = vertex1 - vertex0;
@@ -24,6 +29,15 @@ struct triangle : public hittable {
 		d01 = dot(v0, v1);
 		d11 = dot(v1, v1);
 		invDenom = 1.0f / (d00 * d11 - d01 * d01);
+		};
+
+	__device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const vec3 n0, const vec3 n1, const vec3 n2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
+		: triangle(vec0, vec1, vec2, u0_, v0_, u1_, v1_, u2_, v2_, mat) {
+		normal0 = n0;
+		normal1 = n1;
+		normal2 = n2;
+
+		vertex_normals = true;
 		};
 
 	
@@ -63,9 +77,6 @@ struct triangle : public hittable {
 		if (vertex2.z() > max_z)
 			max_z = vertex2.z();
 
-		//printf("vertices : (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f), (%.3f, %.3f, %.3f)\n", vertex0.x(), vertex0.y(), vertex0.z(), vertex1.x(), vertex1.y(), vertex1.z(), vertex2.x(), vertex2.y(), vertex2.z() );
-		//printf("aabb     : (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f)\n\n", min_x, min_y, min_z, max_x, max_y, max_z);
-		
 		const float small = 0.0001;
 		const float epsilon = 0.000001;
 		if (fabsf(min_x - max_x) < epsilon) {
@@ -84,6 +95,24 @@ struct triangle : public hittable {
 		//creating the bounding box
 		output_box = aabb(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z) );
 		return true;
+	}
+
+
+	__device__ inline void barycentric_coords(const vec3 p, float& Bary0, float& Bary1, float &Bary2) const {
+		//find the uv coordinates by interpolating using barycentric coordinates
+		//https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates	
+		const vec3 v2 = p - vertex0;
+		const float d20 = dot(v2, v0);
+		const float d21 = dot(v2, v1);
+
+		Bary0 = (d11 * d20 - d01 * d21) * invDenom;
+		Bary1 = (d00 * d21 - d01 * d20) * invDenom;
+		Bary2 = 1.0f - Bary0 - Bary1;
+	}
+
+	__device__ inline void barycentric_interp(float &out, const float interp0, const float interp1, const float interp2, const float Bary0, const float Bary1, const float Bary2) const {
+		//https://computergraphics.stackexchange.com/questions/1866/how-to-map-square-texture-to-triangle
+		out = Bary2*interp0 + Bary0*interp1 + Bary1*interp2; 
 	}
 
 };
@@ -124,27 +153,26 @@ __device__ bool triangle::hit(const ray& r, const float t_min, const float t_max
 
 	rec.t = t;
 
-	rec.set_face_normal(r, cross(v1, v0) );
 	rec.mat_ptr = mp;
 	rec.p = r.at(t);
 
+	//finding the uv coords using interpolation with barycentric coordinates
+	float Bary0, Bary1, Bary2;
+	barycentric_coords(rec.p, Bary0, Bary1, Bary2);
+	barycentric_interp(rec.u, u_0, u_1, u_2, Bary0, Bary1, Bary2);
+	barycentric_interp(rec.v, v_0, v_1, v_2, Bary0, Bary1, Bary2);
 	
+	if (!vertex_normals) {
+		rec.set_face_normal(r, cross(v1, v0) );
+	} else {
+		//interpolating the normal vectors
+		vec3 temp_norm_res;
+		for (int i = 0; i < 3; i++) {	//for the 3 components of the normal vector
+			barycentric_interp(temp_norm_res[i], normal0[i], normal1[i], normal2[i], Bary0, Bary1, Bary2);
+		}
+		rec.set_face_normal(r, temp_norm_res);
+	}
 
-	//find the uv coordinates by interpolating using barycentric coordinates
-	//https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates	
-
-	const vec3 v2 = rec.p - vertex0;
-	const float d20 = dot(v2, v0);
-	const float d21 = dot(v2, v1);
-
-	const float Bary0 = (d11 * d20 - d01 * d21) * invDenom;
-	const float Bary1 = (d00 * d21 - d01 * d20) * invDenom;
-	const float Bary2 = 1.0f - Bary0 - Bary1;
-
-
-	//https://computergraphics.stackexchange.com/questions/1866/how-to-map-square-texture-to-triangle
-	rec.u = Bary2*u_0 + Bary0*u_1 + Bary1*u_2; 
-	rec.v = Bary2*v_0 + Bary0*v_1 + Bary1*v_2; 
 
 	return true;	
 }
