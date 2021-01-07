@@ -203,6 +203,8 @@ __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned nu
 
 }
 
+
+
 void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::device_ptr<unsigned> &num_data, int& size) {
 	//size is the size in bytes of all the meshes
 	//num_data is the number of triangles for a mesh
@@ -324,6 +326,20 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 				thrust::raw_pointer_cast(ind_data),
 				thrust::raw_pointer_cast(uv_data),
 				thrust::raw_pointer_cast(norm_data));
+	
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the meshes are created
+
+
+	thrust::device_free(imdata);
+	thrust::device_free(imwidths);
+	thrust::device_free(imhs);
+	thrust::device_free(imch);
+	thrust::device_free(vert_data);
+	thrust::device_free(ind_data);
+	thrust::device_free(uv_data);
+	thrust::device_free(norm_data);
+
 	
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the meshes are created

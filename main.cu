@@ -14,13 +14,13 @@ int main() {
 
 	
 	std::cerr << "Creating World                " << std::flush;
-	door_scene curr_scene;
+	backpack_scene curr_scene;
 
 
 
 	render_settings settings;
 
-	settings.image_width = 1200;
+	settings.image_width = 120;
 	settings.no_fb = 10;
 	settings.samples_per_pixel_per_fb = 10;
 	settings.aspect_ratio = curr_scene.aspect;

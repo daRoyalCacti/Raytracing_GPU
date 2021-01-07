@@ -523,5 +523,51 @@ struct door_scene : public scene {
 };
 
 
+__global__ void create_backpack_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable** obj_list, unsigned* obj_sizes) {
+	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
+		
+		//d_list[0] = new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
+		d_list[0] = new sphere(vec3(0,-100,-1), 100, new lambertian(vec3(0, 1, 0)));
 
+		*d_world    = new hittable_list(d_list, 1);
+		*d_camera   = new camera(vec3(0,0,-3), vec3(0,0,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
+
+	}
+	
+}
+
+
+
+
+
+struct backpack_scene : public scene {
+	backpack_scene() : scene(16.0f/9.0f, background_color::sky) {
+		thrust::device_ptr<unsigned> num;
+		std::vector<std::string> objs;
+		hittable** obj_list;
+		int size_of_meshes;
+		objs.push_back("../assets/backpack/backpack.obj");
+		
+		create_meshes(objs, obj_list, num, size_of_meshes);
+
+		
+
+		curandState* rand_state;
+		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
+
+		world_init<<<1,1>>>(rand_state);	//intialising rand_state
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());
+	
+		//checkCudaErrors(cudaMalloc((void**)&d_list, size_of_meshes + sizeof(hittable*) ));	//+hittable* because of ground
+		checkCudaErrors(cudaMalloc((void**)&d_list, sizeof(hittable*) ));	//+hittable* because of ground
+
+		no_hittables = 1;//2;
+		create_backpack_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, obj_list, thrust::raw_pointer_cast(num));
+
+		checkCudaErrors(cudaGetLastError());
+		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
+
+	}
+};
 
