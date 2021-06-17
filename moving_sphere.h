@@ -9,15 +9,15 @@ struct moving_sphere : public hittable {
 	float radius;
 	material *mat_ptr;
 
-	__device__ moving_sphere();
-	__device__ moving_sphere(const point3 cen0, const point3 cen1, const float _time0, const float _time1, const float r, material *m) :
+	moving_sphere();
+	moving_sphere(const point3 cen0, const point3 cen1, const float _time0, const float _time1, const float r, material *m) :
 		center0(cen0), center1(cen1), time0(_time0), time1(_time1), radius(r), mat_ptr(m) {};
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 
-	__device__ virtual bool bounding_box(const float _time0, const float _time1, aabb& output_box) const override;
+	virtual bool bounding_box(const float _time0, const float _time1, aabb& output_box) const override;
 
-	__device__ inline point3 center(const float time) const {
+	__host__ __device__ inline point3 center(const float time) const {
 		return center0 + (time - time0) / (time1 - time0) * (center1 - center0);
 	}
 };
@@ -58,7 +58,7 @@ __device__ bool moving_sphere::hit(const ray& r, const float t_min, const float 
 	
 }
 
-__device__ bool moving_sphere::bounding_box(const float _time0, const float _time1, aabb& output_box) const {
+bool moving_sphere::bounding_box(const float _time0, const float _time1, aabb& output_box) const {
 	aabb box0(center(_time0) - vec3(radius,radius,radius), center(_time0) + vec3(radius,radius,radius));
 	aabb box1(center(_time1) - vec3(radius,radius,radius), center(_time1) + vec3(radius,radius,radius));
 	output_box = surrounding_box(box0, box1);

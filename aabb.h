@@ -10,11 +10,11 @@ struct aabb {
 					//        orign       min      max
 					//       of ray     
 
-	__device__ aabb() {}
-	__device__ aabb(const point3& a, const point3& b) : minimum(a), maximum(b) {}
+	aabb() {}
+	aabb(const point3& a, const point3& b) : minimum(a), maximum(b) {}
 
-	__device__ inline point3 min() const {return minimum;}
-	__device__ inline point3 max() const {return maximum;}
+	__host__ __device__ inline point3 min() const {return minimum;}
+	__host__ __device__ inline point3 max() const {return maximum;}
 
 	__device__ inline bool hit(const ray& r, float t_min, double t_max) const {
 		//Andrew Kensler (from Pixar) intersection method
@@ -105,7 +105,7 @@ struct aabb {
 
 };
 
-__device__ inline aabb surrounding_box(const aabb box0, const aabb box1) {		//creates a larger bounding box around 2 smaller bounding boxes
+inline aabb surrounding_box(const aabb box0, const aabb box1) {		//creates a larger bounding box around 2 smaller bounding boxes
 	const point3 small(	fminf(box0.min().x(),  box1.min().x()),
 				fminf(box0.min().y(),  box1.min().y()),
 				fminf(box0.min().z(),  box1.min().z()) );

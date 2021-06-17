@@ -24,7 +24,7 @@ struct hit_record {
 
 struct hittable {
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {return false;};	//function to tell when a ray hits the object
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const {return false;};		//function that creates a bounding box around the object
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const {return false;};		//function that creates a bounding box around the object
 };
 
 
@@ -48,7 +48,7 @@ struct translate : public hittable {
 		return true;
 	}
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		if (!ptr->bounding_box(time0, time1, output_box))	//if there is no bounding box
 			return false;					//alse sets output_box
 
@@ -65,17 +65,17 @@ struct rotate_y : public hittable {
 	bool hasbox;			//required to carry info from constructor to bounding_box
 	aabb bbox;
 
-	__device__ rotate_y(hittable *p, const float angle);
+	rotate_y(hittable *p, const float angle);
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		output_box = bbox;
 		return hasbox;
 	}
 };
 
-__device__ rotate_y::rotate_y(hittable *p, const float angle) : ptr(p) {
+rotate_y::rotate_y(hittable *p, const float angle) : ptr(p) {
 	const auto radians = degrees_to_radians(angle);
 	sin_theta = sin(radians);
 	cos_theta = cos(radians);

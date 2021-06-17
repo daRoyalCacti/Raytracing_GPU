@@ -11,7 +11,7 @@ struct box : public hittable {
 	hittable_list *sides;
 	hittable ** temp_hittable;	//for constructing the box
 
-	__device__ box(point3 p0, point3 p1, material *ptr) : box_min(p0), box_max(p1) {
+	box(point3 p0, point3 p1, material *ptr) : box_min(p0), box_max(p1) {
 		temp_hittable = new hittable*[6];
 		
 		temp_hittable[0] = new xy_rect(p0.x(), p1.x(), p0.y(), p1.y(), p1.z(), ptr);
@@ -31,9 +31,9 @@ struct box : public hittable {
 		return sides->hit(r, t_min, t_max, rec, s);
 	}
 
-	__device__ void create(const point3& p0, const point3& p1, material *ptr);
+	void create(const point3& p0, const point3& p1, material *ptr);
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		output_box = aabb(box_min, box_max);
 		return true;
 	}

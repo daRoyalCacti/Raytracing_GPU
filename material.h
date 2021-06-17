@@ -16,10 +16,10 @@ struct material {
 struct lambertian : public material {
 	texturez *albedo;
 	
-	__device__ lambertian(const color& a) {
+	__host__ __device__ lambertian(const color& a) {
 		albedo = new solid_color(a);
 	}
-	__device__ lambertian(texturez* a) : albedo(a) {}
+	__host__ __device__ lambertian(texturez* a) : albedo(a) {}
 
 
 	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
@@ -42,10 +42,10 @@ struct metal : public material {
 			//fuzz = 0 for perfect reflections
 			//fuzz = 1 for very fuzzy reflections
 
-	__device__ metal(const color& a, const float f = 0) : fuzz(f) {
+	__host__ __device__ metal(const color& a, const float f = 0) : fuzz(f) {
 		albedo = new solid_color(a);
 	}
-	__device__ metal(texturez *a) : albedo(a) {}
+	__host__ __device__ metal(texturez *a) : albedo(a) {}
 
 	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
 		vec3 reflected = reflect(unit_vector(ray_in.direction()), rec.normal);	//the incomming ray reflected about the normal
@@ -59,7 +59,7 @@ struct metal : public material {
 struct dielectric : public material {
 	float ir;	//index of refraction of the material
 
-	__device__ dielectric(const float index_of_refraction) : ir(index_of_refraction) {}
+	__host__ __device__ dielectric(const float index_of_refraction) : ir(index_of_refraction) {}
 
 	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
 		attenuation = color(1.0, 1.0, 1.0);	//material should be clear so white is a good choice for the color (absorbs nothing)
@@ -95,7 +95,7 @@ struct dielectric : public material {
 	}
 
 	private:
-	__device__ static float reflectance(const float cosine, const float ref_idx) {
+	__host__ __device__ static float reflectance(const float cosine, const float ref_idx) {
 		//use Schlick's approximation for reflectance
 		const auto sqrt_r0 = (1.0f-ref_idx) / (1.0f+ref_idx);
 		const auto r0 = sqrt_r0 * sqrt_r0;
@@ -107,8 +107,8 @@ struct dielectric : public material {
 struct diffuse_light : public material {
 	texturez *emit;
 
-	__device__ diffuse_light(texturez *a) : emit(a) {}
-	__device__ diffuse_light(const color c) {
+	__host__ __device__ diffuse_light(texturez *a) : emit(a) {}
+	__host__ __device__ diffuse_light(const color c) {
 		emit = new solid_color(c);
 	}
 
@@ -125,10 +125,10 @@ struct diffuse_light : public material {
 struct isotropic : public material {
 	texturez *albedo;
 
-	__device__ isotropic(const color c){
+	__host__ __device__ isotropic(const color c){
 		albedo = new solid_color(c);
 	}
-	__device__ isotropic(texturez *a) : albedo(a) {}
+	__host__ __device__ isotropic(texturez *a) : albedo(a) {}
 
 	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
 		scattered = ray(rec.p, random_in_unit_sphere(s), ray_in.time());	//pick a random direction for the ray to scatter

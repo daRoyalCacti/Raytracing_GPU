@@ -17,13 +17,14 @@ struct triangle_mesh : public hittable {
 	bvh_node* tris;
 	int n;		//number of triangles
 	
-	__device__ triangle_mesh() {}
-	__device__ triangle_mesh(hittable** &triangles, int num, const float time0, const float time1, curandState *s) {
+	triangle_mesh() {}
+	triangle_mesh(hittable** &triangles, int num, const float time0, const float time1) {
 		n = num;
-		tris = new bvh_node(triangles, num, time0, time1, s);
+		tris = new bvh_node(triangles, num, time0, time1);//is erroring
 	}
 
-	__device__ triangle_mesh(hittable** &triangles, unsigned* num, const float time0, const float time1, curandState *s, int id) {
+	/*
+	triangle_mesh(hittable** &triangles, unsigned* num, const float time0, const float time1, curandState *s, int id) {
 		n = num[id];
 		
 		int offset = 0;
@@ -33,6 +34,7 @@ struct triangle_mesh : public hittable {
 
 		tris = new bvh_node(triangles, num[id], time0, time1, s, offset);
 	}
+	*/
 
 
 	
@@ -40,7 +42,7 @@ struct triangle_mesh : public hittable {
 		return tris->hit(r, t_min, t_max, rec, s);
 	}
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		return tris->bounding_box(time0, time1, output_box);	
 	}
 };
@@ -81,33 +83,33 @@ void processMesh(aiMesh *mesh, const aiScene *scene, std::vector<float> &vertice
 		}
 	}
 
-	if (mesh->mMaterialIndex >= 0) {
-		//currently only processes diffuse textures
 
-		//retribve the aiMaterial object from the scene
-		aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
-		//saying that want all diffuse textures
-		const aiTextureType type = aiTextureType_DIFFUSE;
-	
-				//actually loading the textures
-		for (unsigned i = 0; i < mat->GetTextureCount(type); i++) {
-			aiString str;
-			mat->GetTexture(type, i , &str);
-			std::string path = str.C_Str();
+	//currently only processes diffuse textures
 
-			bool already_loaded = false;
-			for (int i = 0; i < tex_paths.size(); i++) {
-				if (path == tex_paths[i]) {
-					already_loaded = true;
-					break;
-				}
+	//retribve the aiMaterial object from the scene
+	aiMaterial *mat = scene->mMaterials[mesh->mMaterialIndex];
+	//saying that want all diffuse textures
+	const aiTextureType type = aiTextureType_DIFFUSE;
+
+			//actually loading the textures
+	for (unsigned i = 0; i < mat->GetTextureCount(type); i++) {
+		aiString str;
+		mat->GetTexture(type, i , &str);
+		std::string path = str.C_Str();
+
+		bool already_loaded = false;
+		for (int i = 0; i < tex_paths.size(); i++) {
+			if (path == tex_paths[i]) {
+				already_loaded = true;
+				break;
 			}
-			if (!already_loaded) {
-				tex_paths.push_back(path);	
-			}
-
 		}
+		if (!already_loaded) {
+			tex_paths.push_back(path);	
+		}
+
 	}
+	
 
 }
 
@@ -125,6 +127,91 @@ void processNode(aiNode *node, const aiScene *scene, std::vector<float> &vertice
 	}
 }
 
+
+triangle_mesh* generate_model(const std::string& file_name, const bool flip_uvs = false)  {
+	//https://learnopengl.com/Model-Loading/Model	
+
+	std::vector<float> vertices;
+	std::vector<unsigned> indices;
+	std::vector<float> uvs;
+	std::vector<float> norms;
+	std::vector<std::string> tex_paths;
+
+	unsigned assimp_settings = aiProcess_Triangulate | aiProcess_GenNormals;
+
+
+	if (flip_uvs)
+		assimp_settings |= aiProcess_FlipUVs;
+
+
+	Assimp::Importer importer;
+	const aiScene *scene = importer.ReadFile(file_name, assimp_settings);	
+	//aiProcess_Triangulate tells assimp to make the model entirely out of triangles
+	//aiProcess_GenNormals creates normal vectors for each vertex
+	//aiProcess_FlipUVS flips the texture coordinates on the y-axis
+
+
+	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+		std::cerr << "Assimp Error:\n\t" << importer.GetErrorString() << std::endl;
+	}
+
+	processNode(scene->mRootNode, scene, vertices, indices, uvs, tex_paths, norms);
+
+
+	//turing the read in data into a triangle mesh
+	hittable** triangles;	
+	triangles = new hittable*[indices.size()/3];
+
+	std::string file_dir = file_name.substr(0, file_name.find_last_of('/') );
+	file_dir.append("/");
+
+
+	auto current_material = new lambertian(new image_texture(file_dir.append(tex_paths[0]).c_str()) );
+	//const auto current_texture = new image_texture(imdata, widths, heights, bytes_per_pixels, i);
+	//const auto current_material = new lambertian(current_texture);
+	for (int i = 0; i < indices.size(); i += 3) {
+		triangles[i/3] = new triangle(	vec3(vertices[ 3*indices[i] ],		//each element of indices refers to 1 vertex
+							vertices[ 3*indices[i]  + 1],	//each vertex has 3 elements - x,y,z
+							vertices[ 3*indices[i]  + 2]),	
+
+							vec3(vertices[ 3*indices[i+1] ],
+							vertices[ 3*indices[i+1]  + 1],
+							vertices[ 3*indices[i+1]  + 2]),
+
+							vec3(vertices[ 3*indices[i+2] ],
+							vertices[ 3*indices[i+2]  + 1],
+							vertices[ 3*indices[i+2]  + 2]),
+
+							vec3(norms[ 3*indices[i] ],		//each element of indices refers to 1 normal
+							norms[ 3*indices[i]  + 1],		//each normal has 3 elements - x,y,z
+							norms[ 3*indices[i]  + 2]),	
+
+							vec3(norms[ 3*indices[i+1] ],
+							norms[ 3*indices[i+1]  + 1],
+							norms[ 3*indices[i+1]  + 2]),
+
+							vec3(norms[ 3*indices[i+2] ],
+							norms[ 3*indices[i+2]  + 1],
+							norms[ 3*indices[i+2]  + 2]),
+
+
+							uvs[2*indices[i] ],
+							uvs[2*indices[i] +1],
+
+							uvs[2*indices[i+1] ],
+							uvs[2*indices[i+1] +1],
+
+							uvs[2*indices[i+2] ],
+							uvs[2*indices[i+2] +1],
+
+							current_material);
+
+
+	}
+
+	return new triangle_mesh(triangles, indices.size()/3, 0, 1);
+
+}
 
 void load_model(const std::string file_name, std::vector<float> &vertices, std::vector<unsigned> &indices, std::vector<float> &uvs, std::vector<std::string> &tex_paths, std::vector<float> &norms) {
 	//https://learnopengl.com/Model-Loading/Model	
@@ -144,6 +231,7 @@ void load_model(const std::string file_name, std::vector<float> &vertices, std::
 
 
 
+/*
 __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned num_objs, unsigned char* imdata, int *widths, int *heights, int* bytes_per_pixels, float* vertices, unsigned* indices, float* uvs, float* norms) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 	
@@ -203,8 +291,9 @@ __global__ void create_meshes_d(hittable** hits, unsigned* num_tris, unsigned nu
 
 }
 
+*/
 
-
+/*
 void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::device_ptr<unsigned> &num_data, int& size) {
 	//size is the size in bytes of all the meshes
 	//num_data is the number of triangles for a mesh
@@ -350,3 +439,4 @@ void create_meshes(std::vector<std::string> objs, hittable** &hits, thrust::devi
 	}
 
 }
+*/

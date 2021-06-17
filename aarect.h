@@ -9,13 +9,13 @@ struct xy_rect : public hittable {
 	material *mp;
 	float x0, x1, y0, y1, k;	//x's and y's define a rectangle in the standard way
 					//k defines z position
-	__device__ xy_rect() {}
-	__device__ xy_rect(const float _x0, const float _x1, const float _y0, const float _y1, const float _k, material *mat)
+	xy_rect() {}
+	xy_rect(const float _x0, const float _x1, const float _y0, const float _y1, const float _k, material *mat)
 		: x0(_x0), x1(_x1), y0(_y0), y1(_y1), k(_k), mp(mat) {};
 	
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		//just padding the z direction by a small amount
 		const float small = 0.0001;
 		output_box = aabb(point3(x0, y0, k-small), point3(x1, y1, k+small));
@@ -28,13 +28,13 @@ struct xz_rect : public hittable {
 	material *mp;
 	float x0, x1, z0, z1, k;	//k defines y position
 
-	__device__ xz_rect() {}
-	__device__ xz_rect(const float _x0, const float _x1, const float _z0, const float _z1, const float _k, material *mat)
+	xz_rect() {}
+	xz_rect(const float _x0, const float _x1, const float _z0, const float _z1, const float _k, material *mat)
 		: x0(_x0), x1(_x1), z0(_z0), z1(_z1), k(_k), mp(mat) {};
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 	
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		const float small = 0.0001;
 		output_box = aabb(point3(x0, k-small, z1), point3(x1, k+small, z1));
 		return true;
@@ -46,13 +46,13 @@ struct yz_rect : public hittable {
 	material *mp;
 	float y0, y1, z0, z1, k;	//k defines x position
 
-	__device__ yz_rect() {}
-	__device__ yz_rect(const float _y0, const float _y1, const float _z0, const float _z1, const float _k, material *mat)
+	yz_rect() {}
+	yz_rect(const float _y0, const float _y1, const float _z0, const float _z1, const float _k, material *mat)
 		: y0(_y0), y1(_y1), z0(_z0), z1(_z1), k(_k), mp(mat) {};
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		const float small = 0.0001;
 		output_box = aabb(point3(k-small, y0, z0), point3(k+small, y1, z1));
 		return true;

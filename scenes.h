@@ -79,6 +79,7 @@ struct scene {
 };
 
 
+/*
 __global__ void create_basic_world(hittable **d_list, hittable **d_world, camera **d_camera) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		*(d_list)   = new sphere(vec3(0,0,-1), 0.5, new lambertian(vec3(0, 1, 0)));
@@ -473,12 +474,12 @@ struct triangles_scene : public scene {
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 	}
 };
+*/
 
-
-__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable** obj_list, unsigned* obj_sizes) {
+__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable* mesh) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
-		d_list[0] = new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
+		d_list[0] = mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
 		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian(vec3(0, 1, 0)));
 
 		*d_world    = new hittable_list(d_list, 2);
@@ -495,19 +496,22 @@ __global__ void create_door_world(hittable **d_list, hittable **d_world, camera 
 struct door_scene : public scene {
 	door_scene() : scene(16.0f/9.0f, background_color::sky) {
 		thrust::device_ptr<unsigned> num;
-		std::vector<std::string> objs;
-		hittable** obj_list;
+		//std::vector<std::string> objs;
+		//hittable** obj_list;
 		int size_of_meshes;
-		objs.push_back("../assets/door/door.obj");
+		//objs.push_back("../assets/door/door.obj");
 		
-		create_meshes(objs, obj_list, num, size_of_meshes);
+		//create_meshes(objs, obj_list, num, size_of_meshes);
+		std::cout << "Generating model\n";
+		auto door_mesh = generate_model("../assets/door/door.obj");
 
 		
 
 		curandState* rand_state;
 		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
 
-		world_init<<<1,1>>>(rand_state);	//intialising rand_state
+		std::cout << "Testing done\n";
+		/*world_init<<<1,1>>>(rand_state);	//intialising rand_state
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 	
@@ -518,11 +522,12 @@ struct door_scene : public scene {
 
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-
+	*/
 	}
 };
 
 
+/*
 __global__ void create_backpack_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable** obj_list, unsigned* obj_sizes) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
@@ -618,5 +623,5 @@ struct cup_scene : public scene {
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
 
 	}
-};
+}; */
 

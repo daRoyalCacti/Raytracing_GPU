@@ -12,19 +12,19 @@ struct constant_medium : public hittable {
 	float neg_inv_density;		//required to move info from constructor to hit
 	
 	//d for density
-	__device__ constant_medium(hittable *b, const float d, texturez *a) 
+	constant_medium(hittable *b, const float d, texturez *a) 
 		: boundary(b), neg_inv_density(-1/d) {
 		phase_function = new isotropic(a);
 		};
 
-	__device__ constant_medium(hittable *b, const float d, color c)
+	constant_medium(hittable *b, const float d, color c)
 		: boundary(b), neg_inv_density(-1/d) {
 		phase_function = new isotropic(c);
 		};
 
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		return boundary->bounding_box(time0, time1, output_box);
 	}
 };

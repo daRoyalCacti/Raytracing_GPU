@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include "common.h"
@@ -25,7 +26,7 @@ struct hittable_id {
 
 
 //helper function to be used in merge sort
-__device__ hittable_id* merge(hittable_id* A, int L1, int R1, int L2, int R2, int axis) {
+hittable_id* merge(hittable_id* A, int L1, int R1, int L2, int R2, int axis) {
 	//A array to be sorted
 	//L1 the start of the first part
 	//R1 the end of the first part
@@ -64,9 +65,7 @@ __device__ hittable_id* merge(hittable_id* A, int L1, int R1, int L2, int R2, in
 	return temp;	
 }
 
-
-
-__device__ void merge_sort(hittable** A, int n, int* O, int axis) {
+void merge_sort(hittable** A, int n, int* O, int axis) {
 	//A input array
 	//n size of input array
 	//O output array
@@ -132,35 +131,35 @@ int size_of_bvh(int n) {
 
 struct bvh_node : public hittable {
 	hittable** objs;	//the actual objects
-	__device__ bvh_node(){}
-	__device__ bvh_node(hittable** &hits, int num_obj, const float time0, const float time1, curandState *s, int offset = 0);
+	bvh_node(){}
+	bvh_node(hittable** &hits, int num_obj, const float time0, const float time1);
 	node_info* info;
 	int n;	//number of objects associated to the tree
 	aabb* bounds;	//the bounding boxes for each node of the tree
 	int* obj_s[3];	//the sorted indices of the objects based on an axis
 
-	__device__ bvh_node(int num_obj);
+	bvh_node(int num_obj);
 
-	__device__ int num_nodes() const {
+	int num_nodes() const {
 		return static_cast<int>(powf(2, ceilf(log2f(n)) ) -1 +n);
 	}
 
 
 
-	__device__ int index_at(int row, int col) const {
+	__host__ __device__ int index_at(int row, int col) const {
 		return powf(2,row) - 1 + col;	
 	}
 
 
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
 };
 
 
 
 
 
-__device__ bvh_node::bvh_node(int num_obj) : n(num_obj) {
+bvh_node::bvh_node(int num_obj) : n(num_obj) {
 	const int num_ne_rows = ceilf(log2f(n));
 	info = new node_info[num_nodes()];
 	
@@ -267,19 +266,16 @@ __device__ bvh_node::bvh_node(int num_obj) : n(num_obj) {
 }
 
 
-__device__ bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0, const float time1, curandState *s, int offset) : bvh_node(num_obj) {
+bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0, const float time1) : bvh_node(num_obj) {
 	
-	objs = new hittable*[num_obj];
-
-	for (int i = 0; i < num_obj; i++) {
-		objs[i] = hits[i+offset];
-	}
+	objs = hits;
 	
 	//first filling the sorted arrays
 	obj_s[0] = new int[n];
 	obj_s[1] = new int[n];
 	obj_s[2] = new int[n];
 
+	//should be updated to use std::sort
 	merge_sort(objs, n, obj_s[0], 0);
 	merge_sort(objs, n, obj_s[1], 1);
 	merge_sort(objs, n, obj_s[2], 2);
@@ -291,7 +287,7 @@ __device__ bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0,
 		info[node].ids = new int[info[node].num];
 	//filling the nodes with the info about the objects they bound
 	for (int node = 0; node < num_nodes() - n; node++) {	//iterating through all nodes less the last row (each node modifies the ids of its children)
-		int axis = random_int(s, 0, 2);			
+		int axis = random_int(0, 2);			
 
 		//setting the ids of the objects passed down to the children
 		
@@ -434,7 +430,7 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 		return false;
 	}
 }
-__device__ bool bvh_node::bounding_box(const float time0, const float time1, aabb& output_box) const {
+bool bvh_node::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	output_box = bounds[0];	//bounding box for the entire tree was already calculated
 	return true;
 }

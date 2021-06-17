@@ -3,6 +3,8 @@
 #include <iostream>
 #include <curand_kernel.h>
 
+#include <random>
+
 //are sort of out of place here
 __device__ inline float random_float(curandState *local_rand_state) {
 	return curand_uniform(local_rand_state);
@@ -10,6 +12,24 @@ __device__ inline float random_float(curandState *local_rand_state) {
 
 __device__ inline float random_float(curandState *local_rand_state, const float min, const float max) {
 	return min + (max-min) * random_float(local_rand_state);
+}
+
+
+__host__ inline double random_double() {
+	//Returns number from U[0,1)
+	static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+	static std::mt19937 generator;
+	return distribution(generator);
+}
+
+__host__ inline double random_double(const double min, const double max) {
+	//Returns number from U[min, max)
+	return min + (max-min)*random_double();
+}
+
+__host__ inline int random_int(const int min, const int max) {
+	//Returns a random integer from U[min,  max]
+	return static_cast<int>(random_double(min, max+1));
 }
 
 
@@ -66,6 +86,15 @@ struct vec3 {
 
 	__device__ inline static vec3 random(curandState *s, const float min, const float max) {
 		return vec3(random_float(s, min, max), random_float(s, min, max), random_float(s, min, max));
+	}
+
+
+	__host__ inline static vec3 random() {	//static because does not need a particular vec3
+		return vec3(random_double(), random_double(), random_double());
+	}
+
+	__host__ inline static vec3 random(const double min, const double max) {
+		return vec3(random_double(min, max), random_double(min, max), random_double(min, max));
 	}
 
 

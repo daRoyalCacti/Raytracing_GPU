@@ -6,15 +6,15 @@
 
 
 struct texturez {
-	__device__ virtual color value(const float u, const float v, const point3& p) const {return color(0,0,0);}
+	__host__ __device__ virtual color value(const float u, const float v, const point3& p) const {return color(0,0,0);}
 };
 
 struct solid_color : public texturez {
-	__device__ solid_color() {}
-	__device__ solid_color(const color c) : color_value(c) {}
-	__device__ solid_color(const float red, const float green, const float blue) : solid_color(color(red, green, blue)) {}
+	__host__ __device__ solid_color() {}
+	__host__ __device__ solid_color(const color c) : color_value(c) {}
+	__host__ __device__ solid_color(const float red, const float green, const float blue) : solid_color(color(red, green, blue)) {}
 	
-	__device__ virtual color value(const float u, const float v, const vec3& p) const override {
+	__host__ __device__ virtual color value(const float u, const float v, const vec3& p) const override {
 		return color_value;
 	}
 
@@ -27,14 +27,14 @@ struct checker_texture : public texturez {
 	texturez *odd;
 	texturez *even;
 
-	__device__ checker_texture() {}
-	__device__ checker_texture(texturez *_even, texturez *_odd) : even(_even), odd(_odd) {}
-	__device__ checker_texture(color c1, color c2)  {//: even(solid_color(c1)), odd(solid_color(c2)) {}
+	__host__ __device__ checker_texture() {}
+	__host__ __device__ checker_texture(texturez *_even, texturez *_odd) : even(_even), odd(_odd) {}
+	__host__ __device__ checker_texture(color c1, color c2)  {//: even(solid_color(c1)), odd(solid_color(c2)) {}
 		even = new solid_color(c1);
 		odd  = new solid_color(c2);
 	}
 
-	__device__ virtual color value(const float u, const float v, const point3& p) const override {
+	__host__ __device__ virtual color value(const float u, const float v, const point3& p) const override {
 		const auto sines = sin(10*p.x()) * sin(10*p.y()) * sin(10*p.z());	//essentially a 4D sine wave
 
 		if(sines < 0)	//sine is periodic. Having a different texture for if sine is positive or negative will given distinct regions of different colors
@@ -54,7 +54,11 @@ struct noise_texture : public texturez {
 		noise = perlin(s);
 	}
 
-	__device__ virtual color value(const float u, const float v, const point3& p) const override {
+	__host__ noise_texture(const float sc = 1.0) : scale(sc) {
+		noise = perlin();
+	}
+
+	__host__ __device__ virtual color value(const float u, const float v, const point3& p) const override {
 		return color(1,1,1) *0.5 *(1.0 + noise.noise(scale*p));	//creates a gray color
 									//needs to be scaled to go between 0 and 1 else the gamma correcting function will return NaN's
 									// (sqrt of a negative number)
@@ -70,8 +74,12 @@ struct turbulent_texture : public texturez {
 	__device__ turbulent_texture(curandState *s, const float sc = 1.0, const int dpt = 7) : scale(sc), depth(dpt) {
 		noise = perlin(s);
 	}
+
+	__host__ turbulent_texture(const float sc = 1.0, const int dpt = 7) : scale(sc), depth(dpt) {
+		noise = perlin();
+	}
 	
-	__device__ virtual color value(const float u, const float v, const point3& p) const override {
+	__host__ __device__ virtual color value(const float u, const float v, const point3& p) const override {
 		return color(1,1,1) * noise.turb(scale*p, depth);
 	}
 };
@@ -84,8 +92,12 @@ struct marble_texture : public texturez {
 	__device__ marble_texture(curandState *s, const float sc = 1.0) : scale(sc) {
 		noise = perlin(s);
 	}
+
+	__host__ marble_texture(const float sc = 1.0) : scale(sc) {
+		noise = perlin();
+	}
 	
-	__device__ virtual color value(const float u, const float v, const point3& p) const override {
+	__host__ __device__ virtual color value(const float u, const float v, const point3& p) const override {
 		return color(1,1,1) * 0.5 * (1 + sinf(scale*p.z() + 10* noise.turb(scale*p, 7) ) );
 	}
 };
@@ -104,7 +116,7 @@ struct image_texture : public texturez {
 
 	//__host__ __device__ image_texture() : data(nullptr), width(0), height(0), bytes_per_scanline(0) {}
 
-	/*__host__ image_texture(const char* filename) {
+	__host__ image_texture(const char* filename) {
 		auto components_per_pixel = bytes_per_pixel;
 
 		data = stbi_load(filename, &width, &height, &components_per_pixel, components_per_pixel);	//reading the data from disk
@@ -114,7 +126,7 @@ struct image_texture : public texturez {
 			width = height =0;
 		}
 		bytes_per_scanline = bytes_per_pixel * width;
-	}*/
+	}
 
 
 	__host__ __device__ ~image_texture() {
@@ -142,12 +154,12 @@ struct image_texture : public texturez {
 	}	
 
 
-	__device__ virtual color value(const float u, const float v, const vec3& p) const override {
+	__host__ __device__ virtual color value(const float u, const float v, const vec3& p) const override {
 		if (data == nullptr)	//if not texture data, return cyan color
 			return color(0, 1, 1);
 		//Clamp input texture coordinates to [0,1]^2
-		const auto uu = clamp_d(u, 0.0f, 1.0f);
-		const auto vv = 1.0 - clamp_d(v, 0.0f, 1.0f);	//Flip v to image coordinates
+		const auto uu = clamp(u, 0.0f, 1.0f);
+		const auto vv = 1.0 - clamp(v, 0.0f, 1.0f);	//Flip v to image coordinates
 
 		auto i = static_cast<int>(uu*width);
 		auto j = static_cast<int>(vv*height);

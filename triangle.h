@@ -15,8 +15,8 @@ struct triangle : public hittable {
 
 	vec3 normal0, normal1, normal2;	//vertex normals (do not have to be set) 
 	
-	__device__ triangle() {}
-	__device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
+	__host__ __device__ triangle() {}
+	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
 		: vertex0(vec0), vertex1(vec1), vertex2(vec2), u_0(u0_), v_0(v0_), u_1(u1_), v_1(v1_), u_2(u2_), v_2(v2_),  mp(mat) {
 
 		vertex_normals = false;
@@ -31,7 +31,7 @@ struct triangle : public hittable {
 		invDenom = 1.0f / (d00 * d11 - d01 * d01);
 		};
 
-	__device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const vec3 n0, const vec3 n1, const vec3 n2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
+	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const vec3 n0, const vec3 n1, const vec3 n2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
 		: triangle(vec0, vec1, vec2, u0_, v0_, u1_, v1_, u2_, v2_, mat) {
 		normal0 = n0;
 		normal1 = n1;
@@ -43,7 +43,7 @@ struct triangle : public hittable {
 	
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *state) const override;
 
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		//finding the min and max of each coordinate
 		float min_x = vertex0.x(), min_y = vertex0.y(), min_z = vertex0.z();
 		float max_x = vertex0.x(), max_y = vertex0.y(), max_z = vertex0.z();

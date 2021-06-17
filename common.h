@@ -3,7 +3,6 @@
 #include <cmath>
 #include <limits>
 #include <memory>
-#include <random>
 #include <curand_kernel.h>
 
 //common headers
@@ -42,7 +41,7 @@ constexpr float infinity = std::numeric_limits<float>::infinity();
 constexpr float pi = 3.1415926535897932385;
 
 //utility functions
-__device__ inline float degrees_to_radians(float degrees) {
+__host__ __device__ inline float degrees_to_radians(float degrees) {
 	return degrees * pi / 180.0f;
 }
 
@@ -52,19 +51,15 @@ __device__ inline float random_int(curandState *local_rand_state, const int min,
 }
 
 
-__host__ inline float clamp(const float x, const float min, const float max) {
+
+
+__device__ __host__ inline float clamp(const float x, const float min, const float max) {
 	//forcing x to be in [min, max]
 	if (x < min) return min;
 	if (x > max) return max;
 	return x;
 }
 
-__device__ inline float clamp_d(const float x, const float min, const float max) {
-	//forcing x to be in [min, max]
-	if (x < min) return min;
-	if (x > max) return max;
-	return x;
-}
 
 
 

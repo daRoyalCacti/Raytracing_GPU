@@ -8,16 +8,16 @@ struct hittable_list : public hittable {
 	hittable** objects;
 	int list_size;
 
-	__device__ hittable_list() {}
-	__device__ hittable_list(hittable **l, int n) :objects(l), list_size(n)  {}
+	__host__ __device__ hittable_list() {}
+	__host__ __device__ hittable_list(hittable **l, int n) :objects(l), list_size(n)  {}
 
 
-	__device__ ~hittable_list() {
+	__host__ __device__ ~hittable_list() {
 		delete objects;
 	}
 
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
 };
 
 __device__ bool hittable_list::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
@@ -39,7 +39,7 @@ __device__ bool hittable_list::hit(const ray& r, const float t_min, const float 
 }
 
 
-__device__ bool hittable_list::bounding_box(const float time0, const float time1, aabb& output_box) const {
+bool hittable_list::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	if (list_size == 0) return false;	//no objects to create bounding boxes for
 
 	aabb temp_box;

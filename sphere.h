@@ -13,7 +13,7 @@ struct sphere : public hittable {
 	__device__ sphere(const point3 cen, const float r, material* m): center(cen), radius(r), mat_ptr(m) {}
 
 	__device__ virtual bool hit(const ray&r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
-	__device__ virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
 
 	private:
 	__device__ static void get_sphere_uv(const point3& p, float& u, float& v) {
@@ -72,7 +72,7 @@ __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, 
 	return true;	//the ray collides with the sphere
 }
 
-__device__ bool sphere::bounding_box(const float time0, const float time1, aabb& output_box) const {
+bool sphere::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	output_box = aabb(center - vec3(radius, radius, radius), center + vec3(radius, radius, radius));
 	return true;
 }
