@@ -14,7 +14,8 @@ int main() {
 
 	
 	std::cerr << "Creating World                " << std::flush;
-	backpack_scene curr_scene;
+	//cup_scene curr_scene;
+	door_scene curr_scene;
 
 
 
