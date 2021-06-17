@@ -25,6 +25,7 @@ struct hittable_id {
 };
 
 
+/*
 //helper function to be used in merge sort
 hittable_id* merge(hittable_id* A, int L1, int R1, int L2, int R2, int axis) {
 	//A array to be sorted
@@ -32,8 +33,9 @@ hittable_id* merge(hittable_id* A, int L1, int R1, int L2, int R2, int axis) {
 	//R1 the end of the first part
 	//L2 the start of the second part
 	//R2 the end of the second part
-	int index = 0;
+	unsigned index = 0;
 	hittable_id* temp = new hittable_id[R1 - L1 + R2 - L2+1];
+	//hittable_id* temp = new hittable_id[R2-L1+1];
 	aabb box1, box2;
 	
 	while (L1 <= R1 && L2 <= R2) {
@@ -72,6 +74,7 @@ void merge_sort(hittable** A, int n, int* O, int axis) {
 
 	hittable_id* Out = new hittable_id[n];
 	
+	std::cout << "a\n";
 	//might need ===================================
 	for (int k = 0; k < n; k++) { 
 		Out[k].obj = A[k];
@@ -79,6 +82,7 @@ void merge_sort(hittable** A, int n, int* O, int axis) {
 	}
 	//=============================================
 
+	std::cout << "b\n";
 
 	int len = 1;
 	int i, L1, R1, L2, R2;
@@ -97,8 +101,9 @@ void merge_sort(hittable** A, int n, int* O, int axis) {
 			if (R2 >= n)
 				R2 = n-1;
 
-			auto temp = merge(Out, L1, R1, L2, R2, axis);
-			
+			const auto temp = merge(Out, L1, R1, L2, R2, axis);
+			std::cout << sizeof(temp)/sizeof(temp[0]) << '\n';
+
 			for (int j=0; j < R2-L1+1; j++) { 
 				Out[i+j] = temp[j];
 			}
@@ -107,12 +112,15 @@ void merge_sort(hittable** A, int n, int* O, int axis) {
 		}
 		len *= 2;
 	}
+	std::cout << "c\n";
 
 	for (int i = 0; i < n; i++) {
 		O[i] = Out[i].index;
 	}
 	
 }
+*/
+
 
 
 int size_of_bvh(int n) {
@@ -265,20 +273,70 @@ bvh_node::bvh_node(int num_obj) : n(num_obj) {
 
 }
 
+inline bool box_compare(hittable_id &a, hittable_id &b, const int axis) {
+	aabb box_a;
+	aabb box_b;
+
+	if (!a.obj->bounding_box(0,0,box_a) || !b.obj->bounding_box(0,0,box_b))
+		std::cerr << "No bounding box in bvh_node constructor.\n";
+
+	return box_a.min().e[axis] < box_b.min().e[axis];
+}
+
+bool box_x_compare (hittable_id &a, hittable_id &b) {
+	return box_compare(a, b, 0);
+}
+
+
+inline bool box_y_compare (hittable_id &a, hittable_id &b) {
+	return box_compare(a, b, 1);
+}
+
+
+inline bool box_z_compare (hittable_id &a, hittable_id &b) {
+	return box_compare(a, b, 2);
+}
+
 
 bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0, const float time1) : bvh_node(num_obj) {
-	
+
 	objs = hits;
+	
 	
 	//first filling the sorted arrays
 	obj_s[0] = new int[n];
 	obj_s[1] = new int[n];
 	obj_s[2] = new int[n];
 
+
+	std::cout << 1 << std::endl;
 	//should be updated to use std::sort
-	merge_sort(objs, n, obj_s[0], 0);
+	/*merge_sort(objs, n, obj_s[0], 0);
 	merge_sort(objs, n, obj_s[1], 1);
-	merge_sort(objs, n, obj_s[2], 2);
+	merge_sort(objs, n, obj_s[2], 2); */
+	hittable_id* temp_objs = new hittable_id[n];
+	for (unsigned k = 0; k < n; k++) {
+		temp_objs[k].obj = objs[k];
+		temp_objs[k].index = k;
+	}
+
+	hittable_id* temp_objs1 = temp_objs;
+	hittable_id* temp_objs2 = temp_objs;
+	hittable_id* temp_objs3 = temp_objs;
+
+	std::sort(temp_objs1, temp_objs1+n, box_x_compare);
+	std::sort(temp_objs2, temp_objs2+n, box_y_compare);
+	std::sort(temp_objs3, temp_objs3+n, box_z_compare);
+
+	for (unsigned i = 0; i  < n; i++) {
+		obj_s[0][i] = temp_objs1[i].index;
+		obj_s[1][i] = temp_objs2[i].index;
+		obj_s[2][i] = temp_objs3[i].index;
+	}
+
+
+
+	std::cout << 2 << std::endl;
 	//the first node contains all objects
 	info[0].ids = new int[n];
 	for (int i = 0; i < n; i++)
@@ -316,6 +374,7 @@ bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0, const floa
 test_goto_point:
 		}
 	}	
+	std::cout << 3 << std::endl;
 	
 	//creating the bounding boxes
 	bounds = new aabb[num_nodes() - n];
@@ -333,6 +392,7 @@ test_goto_point:
 		}
 	}
 
+	std::cout << 4 << std::endl;
 	//for the rest of the rows
 	for (int node = index_at(num_ne_rows - 1, 0) - 1; node >= 0; node--) {	//running through the rest of the nodes backwards
 		bounds[node] = surrounding_box(bounds[info[node].left], bounds[info[node].right]);
