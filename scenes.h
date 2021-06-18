@@ -476,11 +476,33 @@ struct triangles_scene : public scene {
 };
 */
 
-__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable* mesh) {
+__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh* mesh, bvh_node* tris_d, int** objs_d, int* objs0_d) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
 		d_list[0] = mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
 		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian(vec3(0, 1, 0)));
+		
+
+		//printf("%i\n", mesh->tris->obj_s[0][1]);
+		printf("mesh: %X\n\n", mesh);
+
+		printf("tris_d: %X\n", tris_d);
+		printf("mesh->tris: %X\n\n", mesh->tris);
+
+		printf("objs_d: %X\n", objs_d);
+		printf("tris_d->obj_s: %X\n", tris_d->obj_s);
+		printf("mesh->tris->obj_s: %X\n\n", mesh->tris->obj_s);
+
+		printf("objs0_d: %X\n", objs0_d);
+		printf("objs_d[0]: %X\n", objs_d[0]);
+		printf("mesh->tris->obj_s[0]: %X\n\n", mesh->tris->obj_s[0]);
+
+
+		printf("&objs0_d[1] : %X\n", &objs0_d[1]);
+		printf("&mesh->tris->obj_s[0][1]: %X\n\n", &mesh->tris->obj_s[0][1]);
+
+		printf("objs0_d[1] : %i\n", objs0_d[1]);
+		printf("mesh->tris->obj_s[0][1]: %i\n\n", mesh->tris->obj_s[0][1]);
 
 		*d_world    = new hittable_list(d_list, 2);
 		*d_camera   = new camera(vec3(-3,4,-5), vec3(0,1,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
@@ -495,34 +517,72 @@ __global__ void create_door_world(hittable **d_list, hittable **d_world, camera 
 
 struct door_scene : public scene {
 	door_scene() : scene(16.0f/9.0f, background_color::sky) {
-		thrust::device_ptr<unsigned> num;
 		//std::vector<std::string> objs;
 		//hittable** obj_list;
-		int size_of_meshes;
+		//int size_of_meshes;
 		//objs.push_back("../assets/door/door.obj");
 		
 		//create_meshes(objs, obj_list, num, size_of_meshes);
 		std::cout << "Generating model\n";
 		auto door_mesh = generate_model("../assets/door/door.obj");
 
+
+		triangle_mesh* door_mesh_d;
+		bvh_node* tris_d;
+		int** objs_d;
+		int* objs0_d;
+
+		const auto door_n = door_mesh->tris->n;
+
+		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh));
+		cudaMalloc((void**)&tris_d, sizeof(bvh_node ) );
+		cudaMalloc((void**)&objs_d, 3*sizeof(int*));
+		cudaMalloc((void**)&objs0_d, door_n * sizeof(int));
+
+
+		//https://stackoverflow.com/questions/14284964/cuda-how-to-allocate-memory-for-data-member-of-a-class/14286341#14286341
+		//https://stackoverflow.com/questions/15431365/cudamemcpy-segmentation-fault
+		//https://stackoverflow.com/questions/14790999/how-to-pass-a-c-class-with-array-of-pointers-to-cuda/14791979#14791979
+		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh), cudaMemcpyHostToDevice));
+		std::cout << 0 << std::endl;
+		checkCudaErrors(cudaMemcpy(&(door_mesh_d->tris), &tris_d, sizeof(bvh_node*), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(tris_d, door_mesh->tris, sizeof(bvh_node), cudaMemcpyHostToDevice));
+		std::cout << 0.5 << std::endl;
+		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s), &(objs_d), sizeof(int**), cudaMemcpyHostToDevice ));
+		checkCudaErrors(cudaMemcpy(objs_d, door_mesh->tris->obj_s, 3*sizeof(int*), cudaMemcpyHostToDevice));
+		std::cout << 1 << std::endl;
+		checkCudaErrors(cudaMemcpy(&(objs_d[0]), &(objs0_d), sizeof(int*),  cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(objs0_d, door_mesh->tris->obj_s[0], door_n*sizeof(int), cudaMemcpyHostToDevice));
+
+		std::cout << 2 << std::endl;
+		//std::cout<< sizeof(door_mesh->tris->objs[0]) << " " << sizeof(int*) << std::endl;
+
 		
+		//cudaMemcpy(objs0_d, door_mesh->tris->objs[0], door_n * sizeof(int), cudaMemcpyHostToDevice);
+		
+		
+		std::cout << "door_mesh->tris->obj_s[0][1]: " << door_mesh->tris->obj_s[0][1] << "\n";
+
+
+
 
 		curandState* rand_state;
 		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
 
-		std::cout << "Testing done\n";
-		/*world_init<<<1,1>>>(rand_state);	//intialising rand_state
+		//std::cout << "Testing done\n";
+
+		world_init<<<1,1>>>(rand_state);	//intialising rand_state
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 	
-		checkCudaErrors(cudaMalloc((void**)&d_list, size_of_meshes + sizeof(hittable*) ));	//+hittable* because of ground
-
+		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	
+		std::cout<< "tst\n";
 		no_hittables = 2;
-		create_door_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, obj_list, thrust::raw_pointer_cast(num));
+		create_door_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d, tris_d, objs_d, objs0_d);
 
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-	*/
+		std::cout << "magica\n";
 	}
 };
 

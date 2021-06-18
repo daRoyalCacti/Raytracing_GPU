@@ -197,6 +197,7 @@ void imread(std::vector<const char*> impaths, std::vector<int> &ws, std::vector<
 }
 
 
+/*
 void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned char> &imdata, thrust::device_ptr<int> &imwidths, thrust::device_ptr<int> &imhs, thrust::device_ptr<int> &imch) {
 	std::vector<int> ws, hs, nbChannels;	
 	int totalSize = 0;
@@ -212,5 +213,5 @@ void make_image(std ::vector<const char*> impaths, thrust::device_ptr<unsigned c
 	/*for (int i = 0; i < imdata_h.size(); i++) {
 		stbi_image_free(imdata_h[i]);	//can free the cpu data since it has been uploaded to the gpu
 	}*/
-}
+//}
 

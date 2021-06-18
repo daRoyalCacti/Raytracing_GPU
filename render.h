@@ -63,6 +63,7 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
 			return cur_attenuation*background;
 
+		//printf("%i\n",i);
 		ray scattered;
 		color attenuation;
 		const color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
@@ -106,6 +107,8 @@ __global__ void render(vec3* fb, int max_x, int max_y, int ns, camera **cam, cur
 		float v = float(j+random_float(&local_rand_state)) / max_y;
 		
 		ray r = (*cam)->get_ray(rand_state, u,v);
+
+		//printf("%i\n",s);
 		col += color_f(r, world, &local_rand_state, max_depth, back);
 	}
 
