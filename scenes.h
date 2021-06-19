@@ -476,33 +476,21 @@ struct triangles_scene : public scene {
 };
 */
 
-__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh* mesh, bvh_node* tris_d, int** objs_d, int* objs0_d) {
+__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh* mesh) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
 		d_list[0] = mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
 		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian(vec3(0, 1, 0)));
 		
 
-		//printf("%i\n", mesh->tris->obj_s[0][1]);
-		printf("mesh: %X\n\n", mesh);
+		printf("mesh->tris->obj_s[0][1]: %i\n", mesh->tris->obj_s[0][1]);
+		printf("mesh->tris->obj_s[1][1]: %i\n", mesh->tris->obj_s[1][1]);
+		printf("mesh->tris->obj_s[2][1]: %i\n", mesh->tris->obj_s[2][1]);
+		printf("mesh->tris->n: %i\n", mesh->tris->n); 
+		printf("mesh->n: %i\n", mesh->n); 
+ 		printf("mesh->tris->bounds[1].minimum.x: %f\n", mesh->tris->bounds[1].minimum.x());
+		printf("mesh->tris->info[2].ids[1]: %i\n", mesh->tris->info[2].ids[0]);
 
-		printf("tris_d: %X\n", tris_d);
-		printf("mesh->tris: %X\n\n", mesh->tris);
-
-		printf("objs_d: %X\n", objs_d);
-		printf("tris_d->obj_s: %X\n", tris_d->obj_s);
-		printf("mesh->tris->obj_s: %X\n\n", mesh->tris->obj_s);
-
-		printf("objs0_d: %X\n", objs0_d);
-		printf("objs_d[0]: %X\n", objs_d[0]);
-		printf("mesh->tris->obj_s[0]: %X\n\n", mesh->tris->obj_s[0]);
-
-
-		printf("&objs0_d[1] : %X\n", &objs0_d[1]);
-		printf("&mesh->tris->obj_s[0][1]: %X\n\n", &mesh->tris->obj_s[0][1]);
-
-		printf("objs0_d[1] : %i\n", objs0_d[1]);
-		printf("mesh->tris->obj_s[0][1]: %i\n\n", mesh->tris->obj_s[0][1]);
 
 		*d_world    = new hittable_list(d_list, 2);
 		*d_camera   = new camera(vec3(-3,4,-5), vec3(0,1,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
@@ -526,42 +514,88 @@ struct door_scene : public scene {
 		std::cout << "Generating model\n";
 		auto door_mesh = generate_model("../assets/door/door.obj");
 
+		const auto door_n = door_mesh->tris->n;
 
 		triangle_mesh* door_mesh_d;
 		bvh_node* tris_d;
-		int** objs_d;
-		int* objs0_d;
+		int* objs_d[3];
+		int* objs0_d, *objs1_d, *objs2_d;
+		aabb* bounds_d;
+		hittable** objects_d;
+		node_info* info_d;
+		int** ids_d = new int*[num_bvh_nodes(door_n)]; 	//only storing the first value of the host array
 
-		const auto door_n = door_mesh->tris->n;
 
 		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh));
 		cudaMalloc((void**)&tris_d, sizeof(bvh_node ) );
 		cudaMalloc((void**)&objs_d, 3*sizeof(int*));
 		cudaMalloc((void**)&objs0_d, door_n * sizeof(int));
+		cudaMalloc((void**)&objs1_d, door_n * sizeof(int));
+		cudaMalloc((void**)&objs2_d, door_n * sizeof(int));
+		cudaMalloc((void**)&bounds_d, (num_bvh_nodes(door_n) - door_n) * sizeof(aabb) );
+		cudaMalloc((void**)&objects_d, door_n * sizeof(hittable*));
+		cudaMalloc((void**)&info_d, num_bvh_nodes(door_n) * sizeof(node_info));
+		for (size_t i = 0; i < num_bvh_nodes(door_n); i++) {
+			cudaMalloc((void**)&ids_d[i], sizeof(int));
+		}
 
 
 		//https://stackoverflow.com/questions/14284964/cuda-how-to-allocate-memory-for-data-member-of-a-class/14286341#14286341
 		//https://stackoverflow.com/questions/15431365/cudamemcpy-segmentation-fault
 		//https://stackoverflow.com/questions/14790999/how-to-pass-a-c-class-with-array-of-pointers-to-cuda/14791979#14791979
-		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh), cudaMemcpyHostToDevice));
-		std::cout << 0 << std::endl;
-		checkCudaErrors(cudaMemcpy(&(door_mesh_d->tris), &tris_d, sizeof(bvh_node*), cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(tris_d, door_mesh->tris, sizeof(bvh_node), cudaMemcpyHostToDevice));
-		std::cout << 0.5 << std::endl;
-		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s), &(objs_d), sizeof(int**), cudaMemcpyHostToDevice ));
-		checkCudaErrors(cudaMemcpy(objs_d, door_mesh->tris->obj_s, 3*sizeof(int*), cudaMemcpyHostToDevice));
-		std::cout << 1 << std::endl;
-		checkCudaErrors(cudaMemcpy(&(objs_d[0]), &(objs0_d), sizeof(int*),  cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(objs0_d, door_mesh->tris->obj_s[0], door_n*sizeof(int), cudaMemcpyHostToDevice));
+		
+		//std::cout << sizeof(tris_d->obj_s) << " " << sizeof(objs_d) << " " << 3*sizeof(int**) << "\n";
+		//std::cout << sizeof(door_mesh_d->tris) << " " << sizeof(tris_d) << " " << sizeof(bvh_node*) << "\n";
 
-		std::cout << 2 << std::endl;
-		//std::cout<< sizeof(door_mesh->tris->objs[0]) << " " << sizeof(int*) << std::endl;
+		//moving the mesh object itself
+		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh), cudaMemcpyDefault));
+			//moving the bvh_node that the mesh holds 
+			checkCudaErrors(cudaMemcpy(tris_d, door_mesh->tris, sizeof(bvh_node), cudaMemcpyHostToDevice));
+				//moving obj_s[0] inside the bvh_node
+				checkCudaErrors(cudaMemcpy(objs0_d, door_mesh->tris->obj_s[0], door_n*sizeof(int), cudaMemcpyHostToDevice));
+				//moving obj_s[1] inside the bvh_node
+				checkCudaErrors(cudaMemcpy(objs1_d, door_mesh->tris->obj_s[1], door_n*sizeof(int), cudaMemcpyHostToDevice));
+				//moving obj_s[2] inside the bvh_node
+				checkCudaErrors(cudaMemcpy(objs2_d, door_mesh->tris->obj_s[2], door_n*sizeof(int), cudaMemcpyHostToDevice));
+				//moving bounds inside the bvh_node
+				checkCudaErrors(cudaMemcpy(bounds_d, door_mesh->tris->bounds, (num_bvh_nodes(door_n) - door_n) * sizeof(aabb) , cudaMemcpyHostToDevice));
+				//the actual triangle objects in the bvh_node
+				checkCudaErrors(cudaMemcpy(objects_d, door_mesh->tris->objs, door_n * sizeof(hittable*) , cudaMemcpyHostToDevice));
+				//node info for bvh_node
+				checkCudaErrors(cudaMemcpy(info_d, door_mesh->tris->info, num_bvh_nodes(door_n) * sizeof(node_info) , cudaMemcpyHostToDevice));
+					//ids for the node info
+					for (size_t i = 0; i < num_bvh_nodes(door_n); i++) {
+						checkCudaErrors(cudaMemcpy(ids_d[i], door_mesh->tris->info[i].ids, sizeof(int) , cudaMemcpyHostToDevice));
+					}
+
+
+		//moving pointers
+		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s[0]), &(objs0_d), sizeof(int*),   cudaMemcpyDefault)); 	
+		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s[1]), &(objs1_d), sizeof(int*),   cudaMemcpyDefault)); 	
+		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s[2]), &(objs2_d), sizeof(int*),   cudaMemcpyDefault)); 	
+		checkCudaErrors(cudaMemcpy(&(door_mesh_d->tris), &tris_d, sizeof(bvh_node*), cudaMemcpyDefault)); 
+		checkCudaErrors(cudaMemcpy(&(tris_d->bounds), &bounds_d, sizeof(aabb*), cudaMemcpyDefault)); 
+		checkCudaErrors(cudaMemcpy(&(tris_d->objs), &objects_d, sizeof(hittable**), cudaMemcpyDefault)); 
+		checkCudaErrors(cudaMemcpy(&(tris_d->info), &info_d, sizeof(node_info*), cudaMemcpyDefault)); 
+		for (size_t i = 0; i < num_bvh_nodes(door_n); i++) {
+			checkCudaErrors(cudaMemcpy(&(info_d[i].ids), &ids_d[i], sizeof(int*), cudaMemcpyDefault)); 
+		}
+		
+	
+
 
 		
 		//cudaMemcpy(objs0_d, door_mesh->tris->objs[0], door_n * sizeof(int), cudaMemcpyHostToDevice);
 		
 		
 		std::cout << "door_mesh->tris->obj_s[0][1]: " << door_mesh->tris->obj_s[0][1] << "\n";
+		std::cout << "door_mesh->tris->obj_s[1][1]: " << door_mesh->tris->obj_s[1][1] << "\n";
+		std::cout << "door_mesh->tris->obj_s[2][1]: " << door_mesh->tris->obj_s[2][1] << "\n";
+		std::cout << "door_mesh->tris->n: " << door_mesh->tris->n << "\n";
+		std::cout << "door_mesh->n: " << door_mesh->n << "\n";
+		std::cout << "door_mesh->tris->bounds[1].minimum.x: " << door_mesh->tris->bounds[1].minimum.x() << "\n";
+		std::cout << "door_mesh->tris->info[2].ids[1]: " <<  door_mesh->tris->info[2].ids[0] << "\n";
+
 
 
 
@@ -578,7 +612,7 @@ struct door_scene : public scene {
 		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	
 		std::cout<< "tst\n";
 		no_hittables = 2;
-		create_door_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d, tris_d, objs_d, objs0_d);
+		create_door_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d);
 
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
