@@ -25,6 +25,8 @@ struct hit_record {
 struct hittable {
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {return false;};	//function to tell when a ray hits the object
 	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const {return false;};		//function that creates a bounding box around the object
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const {std::cerr << "this should never be called\n";};
 };
 
 

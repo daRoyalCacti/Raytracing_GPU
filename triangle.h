@@ -3,8 +3,10 @@
 #include "hittable.h"
 #include "common.h"
 
+//U should be a material
+template <typename U>
 struct triangle : public hittable {
-	material *mp;
+	U *mp;
 	vec3 vertex0, vertex1, vertex2;	//position of vertex
 	float u_0, v_0, u_1, v_1, u_2, v_2;	//texture coords for each vertex
 	vec3 S, T;	//orthonormal vectors on the plane of the triangle
@@ -16,7 +18,7 @@ struct triangle : public hittable {
 	vec3 normal0, normal1, normal2;	//vertex normals (do not have to be set) 
 	
 	__host__ __device__ triangle() {}
-	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
+	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  U *mat)
 		: vertex0(vec0), vertex1(vec1), vertex2(vec2), u_0(u0_), v_0(v0_), u_1(u1_), v_1(v1_), u_2(u2_), v_2(v2_),  mp(mat) {
 
 		vertex_normals = false;
@@ -31,7 +33,7 @@ struct triangle : public hittable {
 		invDenom = 1.0f / (d00 * d11 - d01 * d01);
 		};
 
-	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const vec3 n0, const vec3 n1, const vec3 n2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  material *mat)
+	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const vec3 n0, const vec3 n1, const vec3 n2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  U *mat)
 		: triangle(vec0, vec1, vec2, u0_, v0_, u1_, v1_, u2_, v2_, mat) {
 		normal0 = n0;
 		normal1 = n1;
@@ -40,6 +42,15 @@ struct triangle : public hittable {
 		vertex_normals = true;
 		};
 
+
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const override {
+		U* mp_d;
+		cudaMalloc((void**)&mp_d, sizeof(U) );
+		checkCudaErrors(cudaMemcpy(mp_d, mp, sizeof(U), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(&(d_ptr->mp), &mp_d, sizeof(U*), cudaMemcpyDefault)); 
+		mp->cpy_constit_d(mp_d);
+	}
 	
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *state) const override;
 
@@ -115,9 +126,12 @@ struct triangle : public hittable {
 		out = Bary2*interp0 + Bary0*interp1 + Bary1*interp2; 
 	}
 
+
+
 };
 
-__device__ bool triangle::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *state) const {
+template <typename U>
+__device__ bool triangle<U>::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *state) const {
 	//using the Moller-Trumbore intersection algorithm
 	//https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
 	

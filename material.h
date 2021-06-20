@@ -11,15 +11,19 @@ struct material {
 	__device__ virtual color emitted(const float u, const float v, const point3& p) const {
 		return color(0, 0, 0);
 	}
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const {std::cerr << "This should never run\n";};
 };
 
+//U should be an texture
+template <typename U>
 struct lambertian : public material {
-	texturez *albedo;
+	U *albedo;
 	
 	__host__ __device__ lambertian(const color& a) {
 		albedo = new solid_color(a);
 	}
-	__host__ __device__ lambertian(texturez* a) : albedo(a) {}
+	__host__ __device__ lambertian(U* a) : albedo(a) {}
 
 
 	__device__ virtual bool scatter(const ray& ray_in, const hit_record& rec, color& attenuation, ray& scattered, curandState *s) const override {
@@ -33,6 +37,16 @@ struct lambertian : public material {
 		attenuation = albedo->value(rec.u, rec.v, rec.p);
 		return true;
 	}
+
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const override {
+		U* albedo_d;
+		cudaMalloc((void**)&albedo_d, sizeof(U) );
+		checkCudaErrors(cudaMemcpy(albedo_d, albedo, sizeof(U), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(&(d_ptr->albedo), &albedo_d, sizeof(U*), cudaMemcpyDefault)); 
+		albedo->cpy_constit_d(albedo_d);
+	}
+
 };
 
 

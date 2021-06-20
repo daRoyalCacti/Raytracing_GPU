@@ -476,18 +476,18 @@ struct triangles_scene : public scene {
 };
 */
 
-__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh* mesh) {
+__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh<lambertian<image_texture>>* mesh) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
 		d_list[0] = mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
-		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian(vec3(0, 1, 0)));
+		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian<solid_color>(vec3(0, 1, 0)));
 		
 
+		printf("mesh->n: %i\n", mesh->n); 
+		printf("mesh->tris->n: %i\n", mesh->tris->n); 
 		printf("mesh->tris->obj_s[0][1]: %i\n", mesh->tris->obj_s[0][1]);
 		printf("mesh->tris->obj_s[1][1]: %i\n", mesh->tris->obj_s[1][1]);
 		printf("mesh->tris->obj_s[2][1]: %i\n", mesh->tris->obj_s[2][1]);
-		printf("mesh->tris->n: %i\n", mesh->tris->n); 
-		printf("mesh->n: %i\n", mesh->n); 
  		printf("mesh->tris->bounds[1].minimum.x: %f\n", mesh->tris->bounds[1].minimum.x());
 		printf("mesh->tris->info[2].ids[1]: %i\n", mesh->tris->info[2].ids[0]);
 
@@ -514,6 +514,13 @@ struct door_scene : public scene {
 		std::cout << "Generating model\n";
 		auto door_mesh = generate_model("../assets/door/door.obj");
 
+
+		triangle_mesh<lambertian<image_texture>>* door_mesh_d;
+		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh<lambertian<image_texture>>));
+		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh<lambertian<image_texture>>), cudaMemcpyDefault));
+		door_mesh->cpy_constit_d(door_mesh_d);
+
+		/*
 		const auto door_n = door_mesh->tris->n;
 
 		triangle_mesh* door_mesh_d;
@@ -525,6 +532,8 @@ struct door_scene : public scene {
 		node_info* info_d;
 		int** ids_d = new int*[num_bvh_nodes(door_n)]; 	//only storing the first value of the host array
 		lambertian** mp_d = new lambertian*[door_n];
+
+
 
 
 		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh));
@@ -592,6 +601,7 @@ struct door_scene : public scene {
 		for (size_t i = 0; i < door_n; i++) {
 			checkCudaErrors(cudaMemcpy(&(objects_d[i]->mp), &mp_d[i], sizeof(lambertian*), cudaMemcpyDefault)); 
 		}
+		*/
 		
 	
 
@@ -600,11 +610,11 @@ struct door_scene : public scene {
 		//cudaMemcpy(objs0_d, door_mesh->tris->objs[0], door_n * sizeof(int), cudaMemcpyHostToDevice);
 		
 		
+		std::cout << "door_mesh->n: " << door_mesh->n << "\n";
+		std::cout << "door_mesh->tris->n: " << door_mesh->tris->n << "\n";
 		std::cout << "door_mesh->tris->obj_s[0][1]: " << door_mesh->tris->obj_s[0][1] << "\n";
 		std::cout << "door_mesh->tris->obj_s[1][1]: " << door_mesh->tris->obj_s[1][1] << "\n";
 		std::cout << "door_mesh->tris->obj_s[2][1]: " << door_mesh->tris->obj_s[2][1] << "\n";
-		std::cout << "door_mesh->tris->n: " << door_mesh->tris->n << "\n";
-		std::cout << "door_mesh->n: " << door_mesh->n << "\n";
 		std::cout << "door_mesh->tris->bounds[1].minimum.x: " << door_mesh->tris->bounds[1].minimum.x() << "\n";
 		std::cout << "door_mesh->tris->info[2].ids[1]: " <<  door_mesh->tris->info[2].ids[0] << "\n";
 

@@ -7,6 +7,8 @@
 
 struct texturez {
 	__host__ __device__ virtual color value(const float u, const float v, const point3& p) const {return color(0,0,0);}
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const {std::cerr << "This should never be called\n";};
 };
 
 struct solid_color : public texturez {

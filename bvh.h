@@ -38,11 +38,12 @@ unsigned size_of_bvh(int n) {
 }
 
 
-
+//U must be a hittable
+template <typename U> 
 struct bvh_node : public hittable {
-	hittable** objs;	//the actual objects
+	U** objs;	//the actual objects
 	bvh_node(){}
-	bvh_node(hittable** &hits, int num_obj, const float time0, const float time1);
+	bvh_node(U** &hits, int num_obj, const float time0, const float time1);
 	node_info* info;
 	int n;	//number of objects associated to the tree
 	aabb* bounds;	//the bounding boxes for each node of the tree
@@ -63,13 +64,88 @@ struct bvh_node : public hittable {
 
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const override;
 	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override;
+
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const override {
+		int* objs0_d, *objs1_d, *objs2_d;
+		aabb* bounds_d;
+		U** objects_dg;
+		U** objects_d = new U*[n];
+		node_info* info_d;
+		int** ids_d = new int*[num_bvh_nodes(n)]; 	//only storing the first value of the host array
+
+
+		cudaMalloc((void**)&objs0_d, n * sizeof(int));
+		cudaMalloc((void**)&objs1_d, n * sizeof(int));
+		cudaMalloc((void**)&objs2_d, n * sizeof(int));
+		cudaMalloc((void**)&bounds_d, (num_bvh_nodes(n) - n) * sizeof(aabb) );
+		//cudaMalloc((void**)&objects_d,n * sizeof(U*));
+		cudaMalloc((void**)&objects_dg, n*sizeof(U*));
+		for (size_t i = 0; i < n; i++) {
+			//std::cout << i << "\n";
+			cudaMalloc((void**)&objects_d[i], sizeof(U));
+		}
+		cudaMalloc((void**)&info_d, num_bvh_nodes(n) * sizeof(node_info));
+		for (size_t i = 0; i < num_bvh_nodes(n); i++) {
+			cudaMalloc((void**)&ids_d[i], sizeof(int));
+		}
+
+
+		//moving obj_s[0] inside the bvh_node
+		checkCudaErrors(cudaMemcpy(objs0_d, obj_s[0], n*sizeof(int), cudaMemcpyHostToDevice));
+		//moving obj_s[1] inside the bvh_node
+		checkCudaErrors(cudaMemcpy(objs1_d, obj_s[1], n*sizeof(int), cudaMemcpyHostToDevice));
+		//moving obj_s[2] inside the bvh_node
+		checkCudaErrors(cudaMemcpy(objs2_d, obj_s[2], n*sizeof(int), cudaMemcpyHostToDevice));
+		//moving bounds inside the bvh_node
+		checkCudaErrors(cudaMemcpy(bounds_d, bounds, (num_bvh_nodes(n) - n) * sizeof(aabb) , cudaMemcpyHostToDevice));
+		//the actual triangle objects in the bvh_node
+		//checkCudaErrors(cudaMemcpy(objects_d, objs, n * sizeof(U*) , cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(objects_dg, objs, n * sizeof(U**) , cudaMemcpyHostToDevice));
+		for (size_t i = 0; i < n; i++) {
+			//std::cout << i << "/" << n << "\n";
+				checkCudaErrors(cudaMemcpy(objects_d[i], objs[i], sizeof(U) , cudaMemcpyHostToDevice));
+		}
+		//node info for bvh_node
+		checkCudaErrors(cudaMemcpy(info_d, info, num_bvh_nodes(n) * sizeof(node_info) , cudaMemcpyHostToDevice));
+			//ids for the node info
+			for (size_t i = 0; i < num_bvh_nodes(n); i++) {
+				checkCudaErrors(cudaMemcpy(ids_d[i], info[i].ids, sizeof(int) , cudaMemcpyHostToDevice));
+			}
+
+		checkCudaErrors(cudaMemcpy(&(d_ptr->obj_s[0]), &(objs0_d), sizeof(int*),   cudaMemcpyDefault)); 	
+		checkCudaErrors(cudaMemcpy(&(d_ptr->obj_s[1]), &(objs1_d), sizeof(int*),   cudaMemcpyDefault)); 	
+		checkCudaErrors(cudaMemcpy(&(d_ptr->obj_s[2]), &(objs2_d), sizeof(int*),   cudaMemcpyDefault)); 	
+		checkCudaErrors(cudaMemcpy(&(d_ptr->bounds), &bounds_d, sizeof(aabb*), cudaMemcpyDefault)); 
+		//checkCudaErrors(cudaMemcpy(&(d_ptr->objs), &objects_d, sizeof(U**), cudaMemcpyDefault)); 
+		checkCudaErrors(cudaMemcpy(&(d_ptr->objs), &objects_dg, sizeof(U**), cudaMemcpyDefault)); 
+		for (size_t i = 0; i < n; i++) {
+			std::cout << i << "\n";
+			//std::cout << &(d_ptr->objs[i]) << "\n";
+			//checkCudaErrors(cudaMemcpy(&(d_ptr->objs[i]), &objects_d[i], sizeof(int*), cudaMemcpyDefault)); 
+			checkCudaErrors(cudaMemcpy(&(objects_dg[i]), &objects_d[i], sizeof(int*), cudaMemcpyDefault)); 
+		}
+		checkCudaErrors(cudaMemcpy(&(d_ptr->info), &info_d, sizeof(node_info*), cudaMemcpyDefault)); 
+		for (size_t i = 0; i < num_bvh_nodes(n); i++) {
+			checkCudaErrors(cudaMemcpy(&(info_d[i].ids), &ids_d[i], sizeof(int*), cudaMemcpyDefault)); 
+		}
+
+
+		
+		for (size_t i = 0; i < n; i++) {
+			//std::cout << objs[i] << std::endl;
+			//std::cout << objects_d[i] << std::endl;
+			objs[i]->cpy_constit_d(objects_d[i]); 	
+		}
+
+	}
 };
 
 
 
 
-
-bvh_node::bvh_node(int num_obj) : n(num_obj) {
+template <typename U>
+bvh_node<U>::bvh_node(int num_obj) : n(num_obj) {
 	const int num_ne_rows = ceilf(log2f(n));
 	info = new node_info[num_nodes()];
 	
@@ -200,8 +276,8 @@ inline bool box_z_compare (hittable_id &a, hittable_id &b) {
 	return box_compare(a, b, 2);
 }
 
-
-bvh_node::bvh_node(hittable** &hits, int  num_obj, const float time0, const float time1) : bvh_node(num_obj) {
+template <typename U>
+bvh_node<U>::bvh_node(U** &hits, int  num_obj, const float time0, const float time1) : bvh_node<U>(num_obj) {
 
 	objs = hits;
 	
@@ -300,7 +376,8 @@ test_goto_point:
 
 }
 
-__device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
+template <typename U>
+__device__ bool bvh_node<U>::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	
 
 	
@@ -389,8 +466,11 @@ __device__ bool bvh_node::hit(const ray& r, const float t_min, const float t_max
 		return false;
 	}
 }
-bool bvh_node::bounding_box(const float time0, const float time1, aabb& output_box) const {
+
+template <typename U>
+bool bvh_node<U>::bounding_box(const float time0, const float time1, aabb& output_box) const {
 	output_box = bounds[0];	//bounding box for the entire tree was already calculated
 	return true;
 }
+
 

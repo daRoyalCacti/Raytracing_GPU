@@ -12,29 +12,19 @@
 #include "assimp/postprocess.h"
 
 
+//U should be a material
+template <typename U>
 struct triangle_mesh : public hittable {
 	//material *mp;
-	bvh_node* tris;
+	bvh_node<triangle<U>>* tris;
 	int n;		//number of triangles
 	
 	triangle_mesh() {}
-	triangle_mesh(hittable** &triangles, int num, const float time0, const float time1) {
+	triangle_mesh(triangle<U>** &triangles, int num, const float time0, const float time1) {
 		n = num;
 		tris = new bvh_node(triangles, num, time0, time1);//is erroring
 	}
 
-	/*
-	triangle_mesh(hittable** &triangles, unsigned* num, const float time0, const float time1, curandState *s, int id) {
-		n = num[id];
-		
-		int offset = 0;
-		for (int i = 0; i < id; i++) {
-			offset += num[i];
-		}
-
-		tris = new bvh_node(triangles, num[id], time0, time1, s, offset);
-	}
-	*/
 
 
 	
@@ -44,6 +34,17 @@ struct triangle_mesh : public hittable {
 
 	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const override {
 		return tris->bounding_box(time0, time1, output_box);	
+	}
+
+
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const override {
+		bvh_node<T>* tris_d;
+		cudaMalloc((void**)&tris_d, sizeof(bvh_node<T> ) );
+		checkCudaErrors(cudaMemcpy(tris_d, tris, sizeof(bvh_node<T>), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(&(d_ptr->tris), &tris_d, sizeof(bvh_node<T>*), cudaMemcpyDefault)); 
+		tris->cpy_constit_d(tris_d);
+
 	}
 };
 
@@ -128,7 +129,7 @@ void processNode(aiNode *node, const aiScene *scene, std::vector<float> &vertice
 }
 
 
-triangle_mesh* generate_model(const std::string& file_name, const bool flip_uvs = false)  {
+triangle_mesh<lambertian<image_texture>>* generate_model(const std::string& file_name, const bool flip_uvs = false)  {
 	//https://learnopengl.com/Model-Loading/Model	
 
 	std::vector<float> vertices;
@@ -159,14 +160,14 @@ triangle_mesh* generate_model(const std::string& file_name, const bool flip_uvs 
 
 
 	//turing the read in data into a triangle mesh
-	hittable** triangles;	
-	triangles = new hittable*[indices.size()/3];
+	triangle<lambertian<image_texture>>** triangles;	
+	triangles = new triangle<lambertian<image_texture>>*[indices.size()/3];
 
 	std::string file_dir = file_name.substr(0, file_name.find_last_of('/') );
 	file_dir.append("/");
 
 
-	auto current_material = new lambertian(new image_texture(file_dir.append(tex_paths[0]).c_str()) );
+	auto current_material = new lambertian<image_texture>(new image_texture(file_dir.append(tex_paths[0]).c_str()) );
 	//const auto current_texture = new image_texture(imdata, widths, heights, bytes_per_pixels, i);
 	//const auto current_material = new lambertian(current_texture);
 	for (int i = 0; i < indices.size(); i += 3) {
