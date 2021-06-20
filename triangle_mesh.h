@@ -13,7 +13,7 @@
 
 
 struct triangle_mesh : public hittable {
-	material *mp;
+	//material *mp;
 	bvh_node* tris;
 	int n;		//number of triangles
 	

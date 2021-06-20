@@ -521,9 +521,10 @@ struct door_scene : public scene {
 		int* objs_d[3];
 		int* objs0_d, *objs1_d, *objs2_d;
 		aabb* bounds_d;
-		hittable** objects_d;
+		triangle** objects_d;
 		node_info* info_d;
 		int** ids_d = new int*[num_bvh_nodes(door_n)]; 	//only storing the first value of the host array
+		lambertian** mp_d = new lambertian*[door_n];
 
 
 		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh));
@@ -533,10 +534,13 @@ struct door_scene : public scene {
 		cudaMalloc((void**)&objs1_d, door_n * sizeof(int));
 		cudaMalloc((void**)&objs2_d, door_n * sizeof(int));
 		cudaMalloc((void**)&bounds_d, (num_bvh_nodes(door_n) - door_n) * sizeof(aabb) );
-		cudaMalloc((void**)&objects_d, door_n * sizeof(hittable*));
+		cudaMalloc((void**)&objects_d, door_n * sizeof(triangle*));
 		cudaMalloc((void**)&info_d, num_bvh_nodes(door_n) * sizeof(node_info));
 		for (size_t i = 0; i < num_bvh_nodes(door_n); i++) {
 			cudaMalloc((void**)&ids_d[i], sizeof(int));
+		}
+		for (size_t i = 0; i < door_n; i++) {
+			cudaMalloc((void**)&mp_d[i], sizeof(lambertian));
 		}
 
 
@@ -560,14 +564,19 @@ struct door_scene : public scene {
 				//moving bounds inside the bvh_node
 				checkCudaErrors(cudaMemcpy(bounds_d, door_mesh->tris->bounds, (num_bvh_nodes(door_n) - door_n) * sizeof(aabb) , cudaMemcpyHostToDevice));
 				//the actual triangle objects in the bvh_node
-				checkCudaErrors(cudaMemcpy(objects_d, door_mesh->tris->objs, door_n * sizeof(hittable*) , cudaMemcpyHostToDevice));
+				checkCudaErrors(cudaMemcpy(objects_d, door_mesh->tris->objs, door_n * sizeof(triangle*) , cudaMemcpyHostToDevice));
+					//the matertials for those objects
+					for (size_t i = 0; i < door_n; i++) {
+							checkCudaErrors(cudaMemcpy(mp_d[i], door_mesh->tris->objs[i]->mp, sizeof(lambertian) , cudaMemcpyHostToDevice));
+					}
 				//node info for bvh_node
 				checkCudaErrors(cudaMemcpy(info_d, door_mesh->tris->info, num_bvh_nodes(door_n) * sizeof(node_info) , cudaMemcpyHostToDevice));
 					//ids for the node info
 					for (size_t i = 0; i < num_bvh_nodes(door_n); i++) {
 						checkCudaErrors(cudaMemcpy(ids_d[i], door_mesh->tris->info[i].ids, sizeof(int) , cudaMemcpyHostToDevice));
 					}
-
+					
+				
 
 		//moving pointers
 		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s[0]), &(objs0_d), sizeof(int*),   cudaMemcpyDefault)); 	
@@ -575,10 +584,13 @@ struct door_scene : public scene {
 		checkCudaErrors(cudaMemcpy(&(tris_d->obj_s[2]), &(objs2_d), sizeof(int*),   cudaMemcpyDefault)); 	
 		checkCudaErrors(cudaMemcpy(&(door_mesh_d->tris), &tris_d, sizeof(bvh_node*), cudaMemcpyDefault)); 
 		checkCudaErrors(cudaMemcpy(&(tris_d->bounds), &bounds_d, sizeof(aabb*), cudaMemcpyDefault)); 
-		checkCudaErrors(cudaMemcpy(&(tris_d->objs), &objects_d, sizeof(hittable**), cudaMemcpyDefault)); 
+		checkCudaErrors(cudaMemcpy(&(tris_d->objs), &objects_d, sizeof(triangle**), cudaMemcpyDefault)); 
 		checkCudaErrors(cudaMemcpy(&(tris_d->info), &info_d, sizeof(node_info*), cudaMemcpyDefault)); 
 		for (size_t i = 0; i < num_bvh_nodes(door_n); i++) {
 			checkCudaErrors(cudaMemcpy(&(info_d[i].ids), &ids_d[i], sizeof(int*), cudaMemcpyDefault)); 
+		}
+		for (size_t i = 0; i < door_n; i++) {
+			checkCudaErrors(cudaMemcpy(&(objects_d[i]->mp), &mp_d[i], sizeof(lambertian*), cudaMemcpyDefault)); 
 		}
 		
 	
