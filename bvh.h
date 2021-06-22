@@ -120,7 +120,7 @@ struct bvh_node : public hittable {
 		//checkCudaErrors(cudaMemcpy(&(d_ptr->objs), &objects_d, sizeof(U**), cudaMemcpyDefault)); 
 		checkCudaErrors(cudaMemcpy(&(d_ptr->objs), &objects_dg, sizeof(U**), cudaMemcpyDefault)); 
 		for (size_t i = 0; i < n; i++) {
-			std::cout << i << "\n";
+			//std::cout << i << "\n";
 			//std::cout << &(d_ptr->objs[i]) << "\n";
 			//checkCudaErrors(cudaMemcpy(&(d_ptr->objs[i]), &objects_d[i], sizeof(int*), cudaMemcpyDefault)); 
 			checkCudaErrors(cudaMemcpy(&(objects_dg[i]), &objects_d[i], sizeof(int*), cudaMemcpyDefault)); 

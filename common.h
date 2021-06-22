@@ -19,6 +19,8 @@
 #include <thrust/random.h>
 #include <thrust/swap.h>
 
+#include <vector>
+
 
 //common usings
 using std::shared_ptr;

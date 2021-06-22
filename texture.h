@@ -1,8 +1,8 @@
 #pragma once
 
 #include "common.h"
-
 #include "perlin.h"
+#include <algorithm>
 
 
 struct texturez {
@@ -107,6 +107,19 @@ struct marble_texture : public texturez {
 
 
 
+struct device_image_data {
+	std::vector<unsigned char*> h_ptrs;
+	std::vector<unsigned char*> d_ptrs;
+};
+
+
+
+namespace global {
+	device_image_data d_i_data;
+};
+
+
+
 
 struct image_texture : public texturez {
 	unsigned char* data;	//the data read from file
@@ -115,6 +128,33 @@ struct image_texture : public texturez {
 	int index = 0;	//index where the texture starts
 
 	int bytes_per_pixel = 3;
+
+
+	//unsigned char* get_device_ptr(image_texture* tex) {
+	unsigned char* get_device_ptr(device_image_data* d) const {
+		const auto h_ptr = data;
+		const auto it = std::find(d->h_ptrs.begin(), d->h_ptrs.end(), h_ptr); 	//getting the iterator to where h_ptr is in the h_ptrs array
+		if (it != d->h_ptrs.end()) { 	//if an element was found
+			const auto index = std::distance(d->h_ptrs.begin(), it); 	//find the index of the iterator in the h_ptrs array
+			return d->d_ptrs[index]; 	//return the corresponding index in the d_ptrs array
+		} else { 	//h_ptr is not in the h_ptrs array
+			d->h_ptrs.push_back(h_ptr); 	//add h_ptr to the array
+			//generate the device ptr
+			d->d_ptrs.push_back(nullptr); 
+			const auto n = d->d_ptrs.size() - 1;
+			cudaMalloc((void**)&d->d_ptrs[n], width * height * sizeof(unsigned char) );
+			checkCudaErrors(cudaMemcpy(d->d_ptrs[n], h_ptr, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
+			return d->d_ptrs[n];
+		}
+
+	}
+
+	template <typename T>
+	void cpy_constit_d(T* d_ptr) const override {
+		const auto d_data = get_device_ptr(&global::d_i_data);
+		checkCudaErrors(cudaMemcpy(&(d_ptr->data), &d_data, sizeof(unsigned char*), cudaMemcpyDefault)); 
+		//std::cout << global::d_i_data.h_ptrs.size() << "\n";
+	}
 
 	//__host__ __device__ image_texture() : data(nullptr), width(0), height(0), bytes_per_scanline(0) {}
 
@@ -176,6 +216,12 @@ struct image_texture : public texturez {
 		return color(color_scale*pixel[0], color_scale*pixel[1], color_scale*pixel[2]);
 	}
 };
+
+
+
+
+
+
 
 void imread(std::vector<const char*> impaths, std::vector<int> &ws, std::vector<int> &hs, std::vector<int> &nbChannels, std::vector<unsigned char> &imdata, int &size) {
 	const int num = impaths.size();

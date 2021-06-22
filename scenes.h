@@ -490,7 +490,8 @@ __global__ void create_door_world(hittable **d_list, hittable **d_world, camera 
 		printf("mesh->tris->obj_s[2][1]: %i\n", mesh->tris->obj_s[2][1]);
  		printf("mesh->tris->bounds[1].minimum.x: %f\n", mesh->tris->bounds[1].minimum.x());
 		printf("mesh->tris->info[2].ids[1]: %i\n", mesh->tris->info[2].ids[0]);
-
+		printf("mesh->tris->objs[1]->vertex0.x: %f\n", mesh->tris->objs[1]->vertex0.x());
+		printf("mesh->tris->objs[1]->mp->albedo->data[150]: %i\n", mesh->tris->objs[1]->mp->albedo->data[150]);
 
 		*d_world    = new hittable_list(d_list, 2);
 		*d_camera   = new camera(vec3(-3,4,-5), vec3(0,1,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
@@ -617,6 +618,8 @@ struct door_scene : public scene {
 		std::cout << "door_mesh->tris->obj_s[2][1]: " << door_mesh->tris->obj_s[2][1] << "\n";
 		std::cout << "door_mesh->tris->bounds[1].minimum.x: " << door_mesh->tris->bounds[1].minimum.x() << "\n";
 		std::cout << "door_mesh->tris->info[2].ids[1]: " <<  door_mesh->tris->info[2].ids[0] << "\n";
+		std::cout << "door_mesh->tris->objs[1]->vertex0.x: " << door_mesh->tris->objs[1]->vertex0.x() <<  "\n";
+		std::cout << "door_mesh->tris->objs[1]->mp->albedo->data[150]: " <<  (int)door_mesh->tris->objs[1]->mp->albedo->data[150] << "\n";
 
 
 
