@@ -25,10 +25,10 @@ struct node_info {
 
 
 int num_bvh_nodes(int n) {
-	return pow(2, ceil(log2(n))) -1 +n;
+	return pow(2, floor(log2(n))+1) -1 +n;
 }
 __device__ int num_bvh_nodes_d(int n) {
-	return pow(2, ceil(log2f(n))) -1 +n;
+	return pow(2, floor(log2f(n))+1) -1 +n;
 }
 
 
@@ -65,7 +65,7 @@ struct bvh_node : public hittable {
 	bvh_node(int num_obj);
 
 	int num_nodes() const {
-		return static_cast<int>(powf(2, ceilf(log2f(n)) ) -1 +n);
+		return static_cast<int>(powf(2, floor(log2f(n)+1) ) -1 +n);
 	}
 
 

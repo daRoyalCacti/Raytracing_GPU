@@ -15,6 +15,7 @@ int main() {
 	
 	std::cerr << "Creating World                " << std::flush;
 	//cup_scene curr_scene;
+	//backpack_scene curr_scene;
 	//crate_scene curr_scene;
 	door_scene curr_scene;
 
