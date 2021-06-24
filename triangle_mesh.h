@@ -22,13 +22,19 @@ struct triangle_mesh : public hittable {
 	triangle_mesh() {}
 	triangle_mesh(triangle<U>** &triangles, int num, const float time0, const float time1) {
 		n = num;
-		tris = new bvh_node(triangles, num, time0, time1);//is erroring
+		tris = new bvh_node(triangles, num, time0, time1);
+	}
+
+	__host__ __device__ triangle_mesh(bvh_node<triangle<U>>* tris_, const int n_) {
+		tris = tris_;
+		n = n_;
 	}
 
 
 
 	
 	__device__ virtual bool hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState *s) const override {
+		//printf("aa\n");
 		return tris->hit(r, t_min, t_max, rec, s);
 	}
 

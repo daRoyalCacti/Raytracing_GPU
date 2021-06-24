@@ -12,6 +12,7 @@ struct hittable_list : public hittable {
 	__host__ __device__ hittable_list(hittable **l, int n) :objects(l), list_size(n)  {}
 
 
+
 	__host__ __device__ ~hittable_list() {
 		delete objects;
 	}
@@ -27,6 +28,8 @@ __device__ bool hittable_list::hit(const ray& r, const float t_min, const float 
 	
 	//testing to see if ray hits anyobject between the given times
 	for (int i = 0; i < list_size; i++) {	//iterating through all objects that could be hit
+		//printf("%i\n", i);
+		//printf("%x\n", objects[i]);
 		if (objects[i]->hit(r, t_min, closest_so_far, temp_rec, s)) {//checking to see if the ray hit the object
 			//printf("%i/%i\n", i, list_size-1);
 			hit_anything = true;

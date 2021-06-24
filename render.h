@@ -60,6 +60,7 @@ __device__ vec3 color_f(ray& r, hittable **world, curandState *local_rand_state,
 	for (int i = 0; i < depth; i++) {
 		hit_record rec;
 
+		//printf("%i\n", i);
 		if (!(*world)->hit(cur_ray, 0.001f, infinity, rec, local_rand_state)) 
 			return cur_attenuation*background;
 

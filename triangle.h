@@ -33,6 +33,31 @@ struct triangle : public hittable {
 		invDenom = 1.0f / (d00 * d11 - d01 * d01);
 		};
 
+	__host__ __device__ triangle(U* tmp, const vec3 tvertex0, const vec3 tvertex1, const vec3 tvertex2, const float tu_0, const float tv_0, const float tu_1, const float tv_1, const float tu_2, const float tv_2, const vec3 tS, const vec3 tT, const vec3 tv0, const vec3 tv1, const float td00, const float td01, const float td11, const float tinvDenom, const bool tvertex_normals, const vec3 tnormal0, const vec3 tnormal1, const vec3 tnormal2) {
+		mp = tmp;
+		vertex0 = tvertex0;
+		vertex1 = tvertex1;
+		vertex2 = tvertex2;
+		u_0 = tu_0;
+		v_0 = tv_0;
+		u_1 = tu_1;
+		v_1 = tv_1;
+		u_2 = tu_2;
+		v_2 = tv_2;
+		S = tS;
+		T = tT;
+		v0 = tv0;
+		v1 = tv1;
+		d00 = td00;
+		d01 = td01;
+		d11 = td11;
+		invDenom = tinvDenom;
+	 	vertex_normals = tvertex_normals;
+		normal0 = tnormal0;
+		normal1 = tnormal1;
+		normal2 = tnormal2;
+	}
+
 	__host__ __device__ triangle(const vec3 vec0, const vec3 vec1, const vec3 vec2, const vec3 n0, const vec3 n1, const vec3 n2, const float u0_, const float v0_, const float u1_, const float v1_, const float u2_, const float v2_,  U *mat)
 		: triangle(vec0, vec1, vec2, u0_, v0_, u1_, v1_, u2_, v2_, mat) {
 		normal0 = n0;
@@ -135,6 +160,8 @@ __device__ bool triangle<U>::hit(const ray& r, const float t_min, const float t_
 	//using the Moller-Trumbore intersection algorithm
 	//https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
 	
+	//printf("qqq\n");
+	
 	const float epsilon = 0.0000001;
 	vec3 h, s, q;
 	float a, f, u, v;
@@ -186,6 +213,8 @@ __device__ bool triangle<U>::hit(const ray& r, const float t_min, const float t_
 		}
 		rec.set_face_normal(r, temp_norm_res);
 	}
+
+	//printf("pppp\n");
 
 
 	return true;	

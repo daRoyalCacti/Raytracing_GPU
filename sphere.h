@@ -34,6 +34,7 @@ struct sphere : public hittable {
 
 __device__ bool sphere::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
 	//using the quadratic equation to find if (and when) 'ray' collides with sphere centred at 'center' with radius 'radius'
+	//printf("bbb\n");
 	
 	const vec3 oc = r.origin() - center;	
 	const float a = r.direction().length_squared();

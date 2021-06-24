@@ -130,6 +130,16 @@ struct image_texture : public texturez {
 	int bytes_per_pixel = 3;
 
 
+	__host__ __device__ image_texture(unsigned char *d, int w, int h, int bpp) : data(d), width(w), height(h), bytes_per_pixel(bpp) {
+		//for intialising the texture with an array of data and an index for that array
+		//d = data pointer
+		//ws = array of widths
+		//hs = array of heights
+		//bpps = array of bytes_per_pixel
+
+		bytes_per_scanline = bytes_per_pixel * width;
+	}
+
 	//unsigned char* get_device_ptr(image_texture* tex) {
 	unsigned char* get_device_ptr(device_image_data* d) const {
 		const auto h_ptr = data;
@@ -142,8 +152,8 @@ struct image_texture : public texturez {
 			//generate the device ptr
 			d->d_ptrs.push_back(nullptr); 
 			const auto n = d->d_ptrs.size() - 1;
-			cudaMalloc((void**)&d->d_ptrs[n], width * height * sizeof(unsigned char) );
-			checkCudaErrors(cudaMemcpy(d->d_ptrs[n], h_ptr, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
+			cudaMalloc((void**)&d->d_ptrs[n], width * height * bytes_per_pixel* sizeof(unsigned char) );
+			checkCudaErrors(cudaMemcpy(d->d_ptrs[n], h_ptr, width * height * bytes_per_pixel * sizeof(unsigned char), cudaMemcpyHostToDevice));
 			return d->d_ptrs[n];
 		}
 

@@ -10,8 +10,8 @@ struct aabb {
 					//        orign       min      max
 					//       of ray     
 
-	aabb() {}
-	aabb(const point3& a, const point3& b) : minimum(a), maximum(b) {}
+	__host__ __device__ aabb() {}
+	__host__ __device__ aabb(const point3& a, const point3& b) : minimum(a), maximum(b) {}
 
 	__host__ __device__ inline point3 min() const {return minimum;}
 	__host__ __device__ inline point3 max() const {return maximum;}

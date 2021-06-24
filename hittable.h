@@ -27,6 +27,10 @@ struct hittable {
 	virtual bool bounding_box(const float time0, const float time1, aabb& output_box) const {return false;};		//function that creates a bounding box around the object
 	template <typename T>
 	void cpy_constit_d(T* d_ptr) const {std::cerr << "this should never be called\n";};
+	/*__device__ virtual bool foo() {
+		printf("foo\n");
+		return false;
+	}*/
 };
 
 

@@ -11,11 +11,24 @@ struct node_info {
 	bool end;
 	int num, left, right, parent;
 	int* ids;	//ids of the objs that a node bounds
+
+	node_info() = default;
+	__host__ __device__ node_info(const bool end_, const int num_, const int left_, const int right_, const int parent_, int* ids_) {
+		end = end_;
+		num = num_;
+		left = left_;
+		right = right_;
+		parent = parent_;
+		ids = ids_;
+	}
 };
 
 
 int num_bvh_nodes(int n) {
 	return pow(2, ceil(log2(n))) -1 +n;
+}
+__device__ int num_bvh_nodes_d(int n) {
+	return pow(2, ceil(log2f(n))) -1 +n;
 }
 
 
@@ -56,6 +69,15 @@ struct bvh_node : public hittable {
 	}
 
 
+	__device__ __host__ bvh_node(U** objs_, node_info* info_, const int n_, aabb* bounds_, int* obj_s0, int* obj_s1, int* obj_s2) {
+		objs = objs_;
+		info = info_;
+		n = n_;
+		bounds = bounds_;
+		obj_s[0] = obj_s0;
+		obj_s[1] = obj_s1;
+		obj_s[2] = obj_s2;
+	}
 
 	__host__ __device__ int index_at(int row, int col) const {
 		return powf(2,row) - 1 + col;	
@@ -378,7 +400,7 @@ test_goto_point:
 
 template <typename U>
 __device__ bool bvh_node<U>::hit(const ray& r, const float t_min, const float t_max, hit_record& rec, curandState* s) const {
-	
+	//printf("vvv\n");
 
 	
 	int row_cntr = 0;	//counter for the current row
@@ -399,6 +421,7 @@ __device__ bool bvh_node<U>::hit(const ray& r, const float t_min, const float t_
 
 	
 	while (!end) {
+		//printf("adsfa\n");
 		current_index = index_at(row_cntr, col_cntr[row_cntr]);
 
 		if (info[current_index].end) {	//if at an end node
@@ -457,6 +480,7 @@ __device__ bool bvh_node<U>::hit(const ray& r, const float t_min, const float t_
 		}
 	}
 
+	//printf("uuu\n");
 
 	delete [] col_cntr;
 
