@@ -476,7 +476,8 @@ struct triangles_scene : public scene {
 };
 */
 
-__global__ void create_door_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh<lambertian<image_texture>>* mesh) {
+
+__global__ void create_obj_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh<lambertian<image_texture>>* mesh) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
 		
 		//assumes there is only 1 texture and 1 material
@@ -513,16 +514,17 @@ __global__ void create_door_world(hittable **d_list, hittable **d_world, camera 
 }
 
 
-struct door_scene : public scene {
-	door_scene() : scene(16.0f/9.0f, background_color::sky) {
+
+struct obj_scene : public scene {
+	obj_scene(const char* file) : scene(16.0f/9.0f, background_color::sky) {
 		std::cout << "Generating model\n";
-		auto door_mesh = generate_model("../assets/door/door.obj");
+		const auto mesh = generate_model(file);
 
 
-		triangle_mesh<lambertian<image_texture>>* door_mesh_d;
-		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh<lambertian<image_texture>>));
-		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh<lambertian<image_texture>>), cudaMemcpyDefault));
-		door_mesh->cpy_constit_d(door_mesh_d);
+		triangle_mesh<lambertian<image_texture>>* mesh_d;
+		cudaMalloc((void**)&mesh_d, sizeof(triangle_mesh<lambertian<image_texture>>));
+		checkCudaErrors(cudaMemcpy(mesh_d, mesh, sizeof(triangle_mesh<lambertian<image_texture>>), cudaMemcpyDefault));
+		mesh->cpy_constit_d(mesh_d);
 
 		curandState* rand_state;
 		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
@@ -534,7 +536,7 @@ struct door_scene : public scene {
 	
 		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	
 		no_hittables = 2;
-		create_door_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d);
+		create_obj_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, mesh_d);
 
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
@@ -543,222 +545,23 @@ struct door_scene : public scene {
 
 
 
+struct door_scene : public obj_scene {
+	door_scene() : obj_scene("../assets/door/door.obj") {}
+};
 
-
-__global__ void create_backpack_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh<lambertian<image_texture>>* mesh) {
-if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
-		
-		//assumes there is only 1 texture and 1 material
-		const auto texture = new image_texture(mesh->tris->objs[0]->mp->albedo->data, mesh->tris->objs[0]->mp->albedo->width, mesh->tris->objs[0]->mp->albedo->height, mesh->tris->objs[0]->mp->albedo->bytes_per_pixel);
-		const auto material = new lambertian(texture);
-		
-		const auto n = mesh->n;
-		auto objects = new triangle<lambertian<image_texture>>*[n];
-		for (size_t i = 0; i < n; i++) {
-			objects[i] = new triangle(material, mesh->tris->objs[i]->vertex0, mesh->tris->objs[i]->vertex1, mesh->tris->objs[i]->vertex2, mesh->tris->objs[i]->u_0, mesh->tris->objs[i]->v_0, mesh->tris->objs[i]->u_1, mesh->tris->objs[i]->v_1, mesh->tris->objs[i]->u_2, mesh->tris->objs[i]->v_2, mesh->tris->objs[i]->S, mesh->tris->objs[i]->T, mesh->tris->objs[i]->v0, mesh->tris->objs[i]->v1, mesh->tris->objs[i]->d00, mesh->tris->objs[i]->d01, mesh->tris->objs[i]->d11, mesh->tris->objs[i]->invDenom, mesh->tris->objs[i]->vertex_normals, mesh->tris->objs[i]->normal0, mesh->tris->objs[i]->normal1, mesh->tris->objs[i]->normal2);
-		}
-		const auto info = new node_info[num_bvh_nodes_d(n)];
-		//const auto info = new node_info[ceil(log2f(n))*n];
-		//for (size_t i = 0; i < ceil(log2f(n))*n; i++) {
-		for (size_t i = 0; i < num_bvh_nodes_d(n); i++) {
-			info[i] = node_info(mesh->tris->info[i].end, mesh->tris->info[i].num, mesh->tris->info[i].left, mesh->tris->info[i].right, mesh->tris->info[i].parent, mesh->tris->info[i].ids);
-		}
-
-		const auto bounds = new aabb[num_bvh_nodes_d(n) - n];
-		for (size_t i = 0; i < num_bvh_nodes_d(n) - n; i++) {
-			bounds[i] = aabb(mesh->tris->bounds[i].minimum, mesh->tris->bounds[i].maximum);
-		}
-		
-		const auto tris_ = new bvh_node(objects, info, mesh->tris->n, bounds, mesh->tris->obj_s[0], mesh->tris->obj_s[1], mesh->tris->obj_s[2]);
-
-		d_list[0] = new triangle_mesh(tris_, mesh->n);//mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
-		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian<solid_color>(vec3(0, 1, 0)));
-
-
-		*d_world    = new hittable_list(d_list, 2);
-		*d_camera   = new camera(vec3(-3,4,-5), vec3(0,1,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
-
-
-	}
-	
-	
-}
-
-
-
-
-
-struct backpack_scene : public scene {
-	backpack_scene() : scene(16.0f/9.0f, background_color::sky) {
-		std::cout << "Generating model\n";
-		auto door_mesh = generate_model("../assets/backpack/backpack.obj");
-
-
-		triangle_mesh<lambertian<image_texture>>* door_mesh_d;
-		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh<lambertian<image_texture>>));
-		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh<lambertian<image_texture>>), cudaMemcpyDefault));
-		door_mesh->cpy_constit_d(door_mesh_d);
-
-		curandState* rand_state;
-		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
-
-		//std::cout << "Testing done\n";
-		world_init<<<1,1>>>(rand_state);	//intialising rand_state
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());
-	
-		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	
-		no_hittables = 2;
-		create_backpack_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d);
-
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-
-	}
+struct backpack_scene : public obj_scene {
+	backpack_scene() : obj_scene("../assets/backpack/backpack.obj") {}
 };
 
 
-
-__global__ void create_cup_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh<lambertian<image_texture>>* mesh) {
-if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
-		
-		//assumes there is only 1 texture and 1 material
-		const auto texture = new image_texture(mesh->tris->objs[0]->mp->albedo->data, mesh->tris->objs[0]->mp->albedo->width, mesh->tris->objs[0]->mp->albedo->height, mesh->tris->objs[0]->mp->albedo->bytes_per_pixel);
-		const auto material = new lambertian(texture);
-		
-		const auto n = mesh->n;
-		auto objects = new triangle<lambertian<image_texture>>*[n];
-		for (size_t i = 0; i < n; i++) {
-			objects[i] = new triangle(material, mesh->tris->objs[i]->vertex0, mesh->tris->objs[i]->vertex1, mesh->tris->objs[i]->vertex2, mesh->tris->objs[i]->u_0, mesh->tris->objs[i]->v_0, mesh->tris->objs[i]->u_1, mesh->tris->objs[i]->v_1, mesh->tris->objs[i]->u_2, mesh->tris->objs[i]->v_2, mesh->tris->objs[i]->S, mesh->tris->objs[i]->T, mesh->tris->objs[i]->v0, mesh->tris->objs[i]->v1, mesh->tris->objs[i]->d00, mesh->tris->objs[i]->d01, mesh->tris->objs[i]->d11, mesh->tris->objs[i]->invDenom, mesh->tris->objs[i]->vertex_normals, mesh->tris->objs[i]->normal0, mesh->tris->objs[i]->normal1, mesh->tris->objs[i]->normal2);
-		}
-		const auto info = new node_info[ceil(log2f(n))*n];
-		for (size_t i = 0; i < ceil(log2f(n))*n; i++) {
-			info[i] = node_info(mesh->tris->info[i].end, mesh->tris->info[i].num, mesh->tris->info[i].left, mesh->tris->info[i].right, mesh->tris->info[i].parent, mesh->tris->info[i].ids);
-		}
-
-		const auto bounds = new aabb[num_bvh_nodes_d(n) - n];
-		for (size_t i = 0; i < num_bvh_nodes_d(n) - n; i++) {
-			bounds[i] = aabb(mesh->tris->bounds[i].minimum, mesh->tris->bounds[i].maximum);
-		}
-		
-		const auto tris_ = new bvh_node(objects, info, mesh->tris->n, bounds, mesh->tris->obj_s[0], mesh->tris->obj_s[1], mesh->tris->obj_s[2]);
-
-		d_list[0] = new triangle_mesh(tris_, mesh->n);//mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
-		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian<solid_color>(vec3(0, 1, 0)));
-
-
-		*d_world    = new hittable_list(d_list, 2);
-		*d_camera   = new camera(vec3(-3,4,-5), vec3(0,1,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
-
-
-	}
-	
-}
-
-
-
-
-
-struct cup_scene : public scene {
-	cup_scene() : scene(16.0f/9.0f, background_color::sky) {
-		std::cout << "Generating model\n";
-		auto door_mesh = generate_model("../assets/cup/cup.obj");
-
-
-		triangle_mesh<lambertian<image_texture>>* door_mesh_d;
-		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh<lambertian<image_texture>>));
-		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh<lambertian<image_texture>>), cudaMemcpyDefault));
-		door_mesh->cpy_constit_d(door_mesh_d);
-
-		curandState* rand_state;
-		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
-
-		//std::cout << "Testing done\n";
-		world_init<<<1,1>>>(rand_state);	//intialising rand_state
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());
-	
-		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	
-		no_hittables = 2;
-		create_cup_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d);
-
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-
-	}
+struct cup_scene : public obj_scene {
+	cup_scene() : obj_scene("../assets/cup/cup.obj") {}
 };
 
 
-
-
-__global__ void create_crate_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, triangle_mesh<lambertian<image_texture>>* mesh) {
-//__global__ void create_crate_world(hittable **d_list, hittable **d_world, camera **d_camera, curandState* s, hittable* mesh) {
-	if (threadIdx.x == 0 && blockIdx.x == 0) {	//no need for parallism
-		
-		//assumes there is only 1 texture and 1 material
-		const auto texture = new image_texture(mesh->tris->objs[0]->mp->albedo->data, mesh->tris->objs[0]->mp->albedo->width, mesh->tris->objs[0]->mp->albedo->height, mesh->tris->objs[0]->mp->albedo->bytes_per_pixel);
-		const auto material = new lambertian(texture);
-		
-		const auto n = mesh->n;
-		auto objects = new triangle<lambertian<image_texture>>*[n];
-		for (size_t i = 0; i < n; i++) {
-			objects[i] = new triangle(material, mesh->tris->objs[i]->vertex0, mesh->tris->objs[i]->vertex1, mesh->tris->objs[i]->vertex2, mesh->tris->objs[i]->u_0, mesh->tris->objs[i]->v_0, mesh->tris->objs[i]->u_1, mesh->tris->objs[i]->v_1, mesh->tris->objs[i]->u_2, mesh->tris->objs[i]->v_2, mesh->tris->objs[i]->S, mesh->tris->objs[i]->T, mesh->tris->objs[i]->v0, mesh->tris->objs[i]->v1, mesh->tris->objs[i]->d00, mesh->tris->objs[i]->d01, mesh->tris->objs[i]->d11, mesh->tris->objs[i]->invDenom, mesh->tris->objs[i]->vertex_normals, mesh->tris->objs[i]->normal0, mesh->tris->objs[i]->normal1, mesh->tris->objs[i]->normal2);
-		}
-		const auto info = new node_info[ceil(log2f(n))*n];
-		for (size_t i = 0; i < ceil(log2f(n))*n; i++) {
-			info[i] = node_info(mesh->tris->info[i].end, mesh->tris->info[i].num, mesh->tris->info[i].left, mesh->tris->info[i].right, mesh->tris->info[i].parent, mesh->tris->info[i].ids);
-		}
-
-		const auto bounds = new aabb[num_bvh_nodes_d(n) - n];
-		for (size_t i = 0; i < num_bvh_nodes_d(n) - n; i++) {
-			bounds[i] = aabb(mesh->tris->bounds[i].minimum, mesh->tris->bounds[i].maximum);
-		}
-
-		
-		const auto tris_ = new bvh_node(objects, info, mesh->tris->n, bounds, mesh->tris->obj_s[0], mesh->tris->obj_s[1], mesh->tris->obj_s[2]);
-
-		d_list[0] = new triangle_mesh(tris_, mesh->n);//mesh; //new triangle_mesh(obj_list, obj_sizes, 0, 1, s, 0);
-		d_list[1] = new sphere(vec3(0,-100,-1), 100, new lambertian<solid_color>(vec3(0, 1, 0)));
-
-		*d_world    = new hittable_list(d_list, 2);
-		*d_camera   = new camera(vec3(-3,4,-5), vec3(0,1,0), vec3(0,1,0), 20, 16.0f/9.0f, 0.0f, 10.0f, 0, 1 );
-
-
-	}
-	
-}
-
-
-
-
-
-struct crate_scene : public scene {
-	crate_scene() : scene(16.0f/9.0f, background_color::sky) {
-
-		std::cout << "Generating model\n";
-		auto door_mesh = generate_model("../assets/crate/Crate1.obj");
-
-
-		triangle_mesh<lambertian<image_texture>>* door_mesh_d;
-		cudaMalloc((void**)&door_mesh_d, sizeof(triangle_mesh<lambertian<image_texture>>));
-		checkCudaErrors(cudaMemcpy(door_mesh_d, door_mesh, sizeof(triangle_mesh<lambertian<image_texture>>), cudaMemcpyDefault));
-		door_mesh->cpy_constit_d(door_mesh_d);
-
-
-		curandState* rand_state;
-		checkCudaErrors(cudaMalloc((void**)&rand_state, sizeof(curandState) ));
-
-		world_init<<<1,1>>>(rand_state);	//intialising rand_state
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());
-	
-		checkCudaErrors(cudaMalloc((void**)&d_list, 2*sizeof(hittable*) ));	
-		no_hittables = 2;
-		create_crate_world<<<1,1>>>(d_list, d_world, d_camera, rand_state, door_mesh_d);
-
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());	//tell cpu the world is created
-	}
+struct crate_scene : public obj_scene {
+	crate_scene() : obj_scene("../assets/crate/Crate1.obj") {}
 };
+
 
 
